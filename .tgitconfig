@@ -1,0 +1,4 @@
+[hook "startcommit"]
+    cmdline = python .py
+    wait = true
+    show = true
