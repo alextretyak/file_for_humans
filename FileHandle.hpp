@@ -1,3 +1,5 @@
+namespace detail
+{
 #ifdef _WIN32
 // [https://stackoverflow.com/questions/30829364/open-utf8-encoded-filename-in-c-windows <- google:‘c++ filesystem utf8 filename’]
 std::u16string ToUtf16(const char *s, size_t l)
@@ -12,10 +14,13 @@ std::u16string ToUtf16(const char *s, size_t l)
     return ret;
 }
 #endif
+}
 
 class FileOpenError {};
 class WrongFileNameStr {};
 
+namespace detail
+{
 template <bool for_reading> class FileHandle
 {
 public:
@@ -72,3 +77,4 @@ HANDLE handle;
 
     ~FileHandle() {close();}
 };
+}

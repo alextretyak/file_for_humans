@@ -6,7 +6,7 @@ const size_t IFILE_DEFAULT_BUFFER_SIZE = 32*1024;
 
 class IFile
 {
-    FileHandle<true> fh;
+    detail::FileHandle<true> fh;
 
 public:
     template <class... Args> IFile(Args&&... args) : fh(std::forward<Args>(args)...) {}
