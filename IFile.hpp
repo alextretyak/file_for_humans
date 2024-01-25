@@ -4,6 +4,14 @@
 
 const size_t IFILE_DEFAULT_BUFFER_SIZE = 32*1024;
 
+/*
+H‘Naming things is hard’
+
+`IFile` is not a very good name, as `I` could mean ‘interface’ (see [https://en.wikipedia.org/wiki/IUnknown]).
+I thought of using `FileReader` or `BufferedFileReader`, but `FileReader` means something different in Java and JavaScript.
+There are `CInFile` and `COutFile` here[https://android.googlesource.com/platform/external/lzma/+/kitkat-dev/CPP/Windows/FileIO.h <- google:‘"class CInFile"’],
+so you can think of `IFile` and `OFile` as short forms of them.
+*/
 class IFile
 {
     detail::FileHandle<true> fh;
