@@ -42,7 +42,11 @@ public:
     {
     }
 
-    std::string read_text()
+    std::string read_text() // reads whole file and returns its contents as a string; only works if the file pointer is at the beginning of the file (`read_text_to_end()` has no such limitation)
+    {
+    }
+
+    std::string read_text_to_end() // the method name was inspired by [https://doc.rust-lang.org/std/io/trait.Read.html#method.read_to_end]
     {
     }
 
@@ -51,6 +55,10 @@ public:
     }
 
     std::vector<uint8_t> read_bytes()
+    {
+    }
+
+    std::vector<uint8_t> read_bytes_to_end()
     {
     }
 
