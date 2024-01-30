@@ -46,8 +46,14 @@ class IFile
 public:
     template <class... Args> IFile(Args&&... args) : fh(std::forward<Args>(args)...) {}
     template <class... Args> bool open(Args&&... args) {return fh.open(std::forward<Args>(args)...);}
-    ~IFile() {close();}
-    void close() {fh.close();}
+    ~IFile() {fh.close();}
+    void close()
+    {
+        fh.close();
+        buffer_pos = 0;
+        buffer_size = 0;
+        is_eof_reached = false;
+    }
 
     void set_buffer_size(size_t sz)
     {
