@@ -26,6 +26,8 @@ std::u16string ToUtf16(const char *s, size_t l)
 
 class FileOpenError {};
 class WrongFileNameStr {};
+class FileIsAlreadyOpened {};
+class AttemptToReadAClosedFile {};
 class IOError {};
 
 namespace detail
@@ -53,8 +55,8 @@ HANDLE handle;
 
     FileHandle() : handle(INVALID_HANDLE_VALUE) {}
     FileHandle(const char *s, size_t len) : FileHandle(ToUtf16(s, len)) {}
-    FileHandle(const char16_t *s, size_t len) {if (!open(s, len)) throw FileOpenError();}
-    FileHandle(const char16_t *s) {if (!open(s)) throw FileOpenError();}
+    FileHandle(const char16_t *s, size_t len) : handle(INVALID_HANDLE_VALUE) {if (!open(s, len)) throw FileOpenError();}
+    FileHandle(const char16_t *s) : handle(INVALID_HANDLE_VALUE) {if (!open(s)) throw FileOpenError();}
     FileHandle(const char *s) : FileHandle(s, strlen(s)) {}
 
     bool open(const char *s, size_t len) {return open(ToUtf16(s, len));}
@@ -68,6 +70,9 @@ HANDLE handle;
 
     bool open(const char16_t *s)
     {
+        if (handle != INVALID_HANDLE_VALUE)
+            throw FileIsAlreadyOpened();
+
         if (for_reading)
             handle = CreateFileW((wchar_t*)s, GENERIC_READ , FILE_SHARE_READ|FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
         else
@@ -77,6 +82,9 @@ HANDLE handle;
 
     size_t read(void *buf, size_t sz)
     {
+        if (handle == INVALID_HANDLE_VALUE)
+            throw AttemptToReadAClosedFile();
+
         DWORD numberOfBytesRead;
         if (!ReadFile(handle, buf, sz, &numberOfBytesRead, NULL))
             throw IOError();
