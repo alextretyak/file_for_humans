@@ -1,8 +1,13 @@
 #include <vector>
 #include <cstdint> // for uint8_t
 #include "FileHandle.hpp"
+#include <memory> // for std::unique_ptr
+#include <assert.h>
 
 const size_t IFILE_DEFAULT_BUFFER_SIZE = 32*1024;
+
+class IFileBufferAlreadyAllocated {};
+class UnexpectedEOF {};
 
 /*
 H‘Naming things is hard’
@@ -15,12 +20,41 @@ so you can think of `IFile` and `OFile` as short forms of them.
 class IFile
 {
     detail::FileHandle<true> fh;
+    std::unique_ptr<uint8_t[]> buffer;
+    size_t buffer_pos = 0, buffer_size = 0, buffer_capacity = IFILE_DEFAULT_BUFFER_SIZE;
+    bool is_eof_reached = false;
+
+    NOINLINE bool has_no_data_left()
+    {
+        assert(buffer_pos == buffer_size); // make sure there is no available data in the buffer
+
+        if (is_eof_reached) // check to prevent extra `read()` syscalls
+            return true;
+
+        if (buffer == nullptr)
+            buffer.reset(new uint8_t[buffer_capacity]);
+
+        buffer_size = fh.read(buffer.get(), buffer_capacity);
+        if (buffer_size < buffer_capacity)
+            is_eof_reached = true;
+
+        buffer_pos = 0;
+
+        return buffer_size == 0;
+    }
 
 public:
     template <class... Args> IFile(Args&&... args) : fh(std::forward<Args>(args)...) {}
     template <class... Args> bool open(Args&&... args) {return fh.open(std::forward<Args>(args)...);}
     ~IFile() {close();}
-    void close() {flush(); fh.close();}
+    void close() {fh.close();}
+
+    void set_buffer_size(size_t sz)
+    {
+        if (buffer != nullptr)
+            throw IFileBufferAlreadyAllocated();
+        buffer_capacity = sz;
+    }
 
     /*
     `at_eof()` function works like `eof()` in Pascal, i.e. it returns true if the file is at the end.
@@ -29,6 +63,9 @@ public:
     */
     bool at_eof()
     {
+        if (buffer_pos < buffer_size)
+            return false;
+        return has_no_data_left();
     }
 
     /*
@@ -40,6 +77,13 @@ public:
     */
     bool eof_passed()
     {
+    }
+
+    uint8_t read_byte()
+    {
+        if (at_eof())
+            throw UnexpectedEOF();
+        return buffer[buffer_pos++];
     }
 
     std::string read_text() // reads whole file and returns its contents as a string; only works if the file pointer is at the beginning of the file (`read_text_to_end()` has no such limitation)
@@ -63,14 +107,6 @@ public:
     }
 
     std::vector<uint8_t> read_bytes_at_most()
-    {
-    }
-
-    uint8_t read_byte()
-    {
-    }
-
-    void flush()
     {
     }
 };

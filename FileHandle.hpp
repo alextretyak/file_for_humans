@@ -1,3 +1,11 @@
+#ifdef __GNUC__
+#define NOINLINE __attribute__((noinline))
+#elif _MSC_VER
+#define NOINLINE __declspec(noinline)
+#else
+#define NOINLINE
+#endif
+
 namespace detail
 {
 #ifdef _WIN32
@@ -18,6 +26,7 @@ std::u16string ToUtf16(const char *s, size_t l)
 
 class FileOpenError {};
 class WrongFileNameStr {};
+class IOError {};
 
 namespace detail
 {
@@ -64,6 +73,14 @@ HANDLE handle;
         else
             handle = CreateFileW((wchar_t*)s, GENERIC_WRITE, FILE_SHARE_READ|FILE_SHARE_WRITE, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
         return handle != INVALID_HANDLE_VALUE;
+    }
+
+    size_t read(void *buf, size_t sz)
+    {
+        DWORD numberOfBytesRead;
+        if (!ReadFile(handle, buf, sz, &numberOfBytesRead, NULL))
+            throw IOError();
+        return numberOfBytesRead;
     }
 
     void close()
