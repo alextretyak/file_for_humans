@@ -1,3 +1,9 @@
+#include <string>
+#ifndef _WIN32
+#include <fcntl.h> // for `open()`
+#include <unistd.h> // for `read()`
+#endif
+
 #ifdef __GNUC__
 #define NOINLINE __attribute__((noinline))
 #elif _MSC_VER
@@ -96,6 +102,58 @@ HANDLE handle;
         if (handle != INVALID_HANDLE_VALUE) {
             CloseHandle(handle);
             handle = INVALID_HANDLE_VALUE;
+        }
+    }
+#else
+    int fd;
+    FileHandle(FileHandle &&fh) : fd(fh.fd) {fh.fd = -1;}
+    FileHandle &operator=(FileHandle &&fh)
+    {
+        close();
+        fd = fh.fd;
+        fh.fd = -1;
+        return *this;
+    }
+
+    FileHandle() : fd(-1) {}
+    FileHandle(const char *s) : fd(-1) {if (!open(s)) throw FileOpenError();}
+
+    bool open(const char *s)
+    {
+        if (fd != -1)
+            throw FileIsAlreadyOpened();
+
+        if (for_reading)
+            fd = ::open(s, O_RDONLY);
+        else
+            fd = creat(s, 0666);
+        return fd != -1;
+    }
+
+    size_t read(void *buf, size_t sz)
+    {
+        if (fd == -1)
+            throw AttemptToReadAClosedFile();
+
+        char *b = (char*)buf;
+        for (;;) {
+            ssize_t r = ::read(fd, b, std::min(sz, (size_t)0x7ffff000)); // On Linux, read() will transfer at most 0x7ffff000 bytes
+            if (r == -1)
+                throw IOError();
+            if (r == 0)
+                return b - (char*)buf;
+            b += r;
+            sz -= r;
+            if (sz == 0)
+                return b - (char*)buf;
+        }
+    }
+
+    void close()
+    {
+        if (fd != -1) {
+            ::close(fd);
+            fd = -1;
         }
     }
 #endif
