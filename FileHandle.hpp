@@ -1,4 +1,5 @@
 #include <string>
+#include <algorithm>
 #ifndef _WIN32
 #include <fcntl.h> // for `open()`
 #include <unistd.h> // for `read()`
@@ -91,10 +92,26 @@ HANDLE handle;
         if (handle == INVALID_HANDLE_VALUE)
             throw AttemptToReadAClosedFile();
 
-        DWORD numberOfBytesRead;
-        if (!ReadFile(handle, buf, sz, &numberOfBytesRead, NULL))
-            throw IOError();
-        return numberOfBytesRead;
+        if (sz <= 0xFFFFFFFFu) {
+            DWORD numberOfBytesRead;
+            if (!ReadFile(handle, buf, (DWORD)sz, &numberOfBytesRead, NULL))
+                throw IOError();
+            return numberOfBytesRead;
+        }
+        else {
+            char *b = (char*)buf;
+            while (true) {
+                DWORD numberOfBytesRead;
+                if (!ReadFile(handle, b, (DWORD)(std::min)(sz, (size_t)0xFFFF0000), &numberOfBytesRead, NULL))
+                    throw IOError();
+                if (numberOfBytesRead == 0)
+                    return b - (char*)buf;
+                b += numberOfBytesRead;
+                sz -= numberOfBytesRead;
+                if (sz == 0)
+                    return b - (char*)buf;
+            }
+        }
     }
 
     void close()
@@ -136,7 +153,7 @@ HANDLE handle;
             throw AttemptToReadAClosedFile();
 
         char *b = (char*)buf;
-        for (;;) {
+        while (true) {
             ssize_t r = ::read(fd, b, std::min(sz, (size_t)0x7ffff000)); // On Linux, read() will transfer at most 0x7ffff000 bytes
             if (r == -1)
                 throw IOError();
