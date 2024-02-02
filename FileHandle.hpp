@@ -1,9 +1,14 @@
+#pragma once
 #include <string>
 #include <algorithm>
-#ifndef _WIN32
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#else
 #include <fcntl.h> // for `open()`
 #include <unistd.h> // for `read()`
 #endif
+#include "utf.hpp"
 
 #ifdef __GNUC__
 #define NOINLINE __attribute__((noinline))
@@ -12,24 +17,6 @@
 #else
 #define NOINLINE
 #endif
-
-namespace detail
-{
-#ifdef _WIN32
-// [https://stackoverflow.com/questions/30829364/open-utf8-encoded-filename-in-c-windows <- google:‘c++ filesystem utf8 filename’]
-std::u16string ToUtf16(const char *s, size_t l)
-{
-    std::u16string ret;
-    int len = MultiByteToWideChar(CP_UTF8, 0, s, l, NULL, 0);
-    if (len > 0)
-    {
-        ret.resize(len);
-        MultiByteToWideChar(CP_UTF8, 0, s, l, (wchar_t*)&ret[0], len);
-    }
-    return ret;
-}
-#endif
-}
 
 class FileOpenError {};
 class WrongFileNameStr {};
@@ -61,13 +48,13 @@ HANDLE handle;
     }
 
     FileHandle() : handle(INVALID_HANDLE_VALUE) {}
-    FileHandle(const char *s, size_t len) : FileHandle(ToUtf16(s, len)) {}
+    FileHandle(const char *s, size_t len) : FileHandle(utf::as_u16(std::string_view(s, len))) {}
     FileHandle(const char16_t *s, size_t len) : handle(INVALID_HANDLE_VALUE) {if (!open(s, len)) throw FileOpenError();}
     FileHandle(const char16_t *s) : handle(INVALID_HANDLE_VALUE) {if (!open(s)) throw FileOpenError();}
-    FileHandle(const char *s) : FileHandle(s, strlen(s)) {}
+    FileHandle(const char *s) : FileHandle(utf::as_u16(s)) {}
 
-    bool open(const char *s, size_t len) {return open(ToUtf16(s, len));}
-    bool open(const char *s)             {return open(s, strlen(s));}
+    bool open(const char *s, size_t len) {return open(utf::as_u16(std::string_view(s, len)));}
+    bool open(const char *s)             {return open(utf::as_u16(s));}
     bool open(const char16_t *s, size_t len)
     {
         if (s[len] != 0)
@@ -134,6 +121,18 @@ HANDLE handle;
 
     FileHandle() : fd(-1) {}
     FileHandle(const char *s) : fd(-1) {if (!open(s)) throw FileOpenError();}
+    FileHandle(const char *s, size_t len) : fd(-1) {if (!open(s, len)) throw FileOpenError();}
+    FileHandle(const char16_t *s) : FileHandle(utf::as_str8(s)) {}
+    FileHandle(const char16_t *s, size_t len) : FileHandle(utf::as_str8(std::u16string_view(s, len))) {}
+
+    bool open(const char16_t *s, size_t len) {return open(utf::as_str8(std::u16string_view(s, len)));}
+    bool open(const char16_t *s)             {return open(utf::as_str8(s));}
+    bool open(const char *s, size_t len)
+    {
+        if (s[len] != 0)
+            throw WrongFileNameStr();
+        open(s);
+    }
 
     bool open(const char *s)
     {
