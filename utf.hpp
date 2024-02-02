@@ -48,7 +48,40 @@
 //#include <utf/utf.hpp>
 #include <string>
 
+#define constexpr
+
 namespace utf {
+    namespace std {
+        template <typename char_type> class basic_string_view
+        {
+            const char_type *s;
+            size_t len;
+
+        public:
+            basic_string_view(const char_type *s) : s(s), len(::std::char_traits<char_type>::length(s)) {}
+            basic_string_view(const char_type *s, size_t len) : s(s), len(len) {}
+            basic_string_view(const ::std::basic_string<char_type> &s) : s(s.data()), len(s.length()) {}
+
+            typedef const char_type* const_iterator;
+            const_iterator begin() const { return s; }
+            const_iterator end() const { return s + len; }
+
+            const char_type *data() const { return s; }
+            size_t           size() const { return len; }
+        };
+        typedef basic_string_view<char> string_view;
+        typedef basic_string_view<char16_t> u16string_view;
+        typedef basic_string_view<char32_t> u32string_view;
+        using ::std::back_insert_iterator;
+        using ::std::string;
+        using ::std::u16string;
+        using ::std::u32string;
+#ifdef __cpp_lib_char8_t
+        typedef basic_string_view<char8_t> u8string_view;
+        using ::std::u8string;
+#endif
+        using ::std::back_inserter;
+    }
     /*
      * Index into the table below with the first byte of a UTF-8 sequence to
      * get the number of trailing bytes that are supposed to follow it.
@@ -111,7 +144,7 @@ namespace utf {
     // used for shifting by 10 bits
     static constexpr const unsigned halfShift = 10;
 
-    static constexpr const char32_t halfBase = 0x0001'0000UL;
+    static constexpr const char32_t halfBase = 0x00010000UL;
     static constexpr const char32_t halfMask = 0x3FFUL;
     static constexpr const char32_t byteMask = 0xBF;
     static constexpr const char32_t byteMark = 0x80;
@@ -127,11 +160,11 @@ namespace utf {
             case 4:
                 if ((a = static_cast<uint8_t>(*--srcptr)) < 0x80 || a > 0xBF)
                     return false;
-                [[fallthrough]];
+                //[[fallthrough]];
             case 3:
                 if ((a = static_cast<uint8_t>(*--srcptr)) < 0x80 || a > 0xBF)
                     return false;
-                [[fallthrough]];
+                //[[fallthrough]];
             case 2:
                 if ((a = static_cast<uint8_t>(*--srcptr)) < 0x80 || a > 0xBF)
                     return false;
@@ -153,7 +186,7 @@ namespace utf {
                     default:
                         if (a < 0x80) return false;
                 }
-                [[fallthrough]];
+                //[[fallthrough]];
 
             case 1:
                 if (static_cast<uint8_t>(*source) >= 0x80 &&
@@ -184,15 +217,15 @@ namespace utf {
             case 3:
                 ch += static_cast<uint8_t>(*source++);
                 ch <<= 6;
-                [[fallthrough]];
+                //[[fallthrough]];
             case 2:
                 ch += static_cast<uint8_t>(*source++);
                 ch <<= 6;
-                [[fallthrough]];
+                //[[fallthrough]];
             case 1:
                 ch += static_cast<uint8_t>(*source++);
                 ch <<= 6;
-                [[fallthrough]];
+                //[[fallthrough]];
             case 0:
                 ch += static_cast<uint8_t>(*source++);
         }
@@ -222,15 +255,15 @@ namespace utf {
             case 3:
                 ch += static_cast<uint8_t>(*source++);
                 ch <<= 6;
-                [[fallthrough]];
+                //[[fallthrough]];
             case 2:
                 ch += static_cast<uint8_t>(*source++);
                 ch <<= 6;
-                [[fallthrough]];
+                //[[fallthrough]];
             case 1:
                 ch += static_cast<uint8_t>(*source++);
                 ch <<= 6;
-                [[fallthrough]];
+                //[[fallthrough]];
             case 0:
                 ch += static_cast<uint8_t>(*source++);
         }
@@ -301,15 +334,15 @@ namespace utf {
             case 4:
                 *--midp = static_cast<uint8_t>((ch | byteMark) & byteMask);
                 ch >>= 6;
-                [[fallthrough]];
+                //[[fallthrough]];
             case 3:
                 *--midp = static_cast<uint8_t>((ch | byteMark) & byteMask);
                 ch >>= 6;
-                [[fallthrough]];
+                //[[fallthrough]];
             case 2:
                 *--midp = static_cast<uint8_t>((ch | byteMark) & byteMask);
                 ch >>= 6;
-                [[fallthrough]];
+                //[[fallthrough]];
             case 1:
                 *--midp =
                     static_cast<uint8_t>(ch | firstByteMark[bytesToWrite]);
@@ -347,15 +380,15 @@ namespace utf {
             case 4:
                 *--midp = static_cast<uint8_t>((ch | byteMark) & byteMask);
                 ch >>= 6;
-                [[fallthrough]];
+                //[[fallthrough]];
             case 3:
                 *--midp = static_cast<uint8_t>((ch | byteMark) & byteMask);
                 ch >>= 6;
-                [[fallthrough]];
+                //[[fallthrough]];
             case 2:
                 *--midp = static_cast<uint8_t>((ch | byteMark) & byteMask);
                 ch >>= 6;
-                [[fallthrough]];
+                //[[fallthrough]];
             case 1:
                 *--midp =
                     static_cast<uint8_t>(ch | firstByteMark[bytesToWrite]);
@@ -419,7 +452,7 @@ namespace utf {
 
         while (source < sourceEnd) {
             bool ok = false;
-            [[maybe_unused]] char32_t ch = decode(source, sourceEnd, ok);
+            /*[[maybe_unused]] char32_t ch = */decode(source, sourceEnd, ok);
             if (!ok) return false;
         }
 
@@ -506,3 +539,5 @@ namespace utf {
     }
 #endif  // __cpp_lib_char8_t
 }  // namespace utf
+
+#undef constexpr

@@ -48,12 +48,12 @@ HANDLE handle;
     }
 
     FileHandle() : handle(INVALID_HANDLE_VALUE) {}
-    FileHandle(const char *s, size_t len) : FileHandle(utf::as_u16(std::string_view(s, len))) {}
+    FileHandle(const char *s, size_t len) : FileHandle(utf::as_u16(utf::std::string_view(s, len))) {}
     FileHandle(const char16_t *s, size_t len) : handle(INVALID_HANDLE_VALUE) {if (!open(s, len)) throw FileOpenError();}
     FileHandle(const char16_t *s) : handle(INVALID_HANDLE_VALUE) {if (!open(s)) throw FileOpenError();}
     FileHandle(const char *s) : FileHandle(utf::as_u16(s)) {}
 
-    bool open(const char *s, size_t len) {return open(utf::as_u16(std::string_view(s, len)));}
+    bool open(const char *s, size_t len) {return open(utf::as_u16(utf::std::string_view(s, len)));}
     bool open(const char *s)             {return open(utf::as_u16(s));}
     bool open(const char16_t *s, size_t len)
     {
@@ -123,9 +123,9 @@ HANDLE handle;
     FileHandle(const char *s) : fd(-1) {if (!open(s)) throw FileOpenError();}
     FileHandle(const char *s, size_t len) : fd(-1) {if (!open(s, len)) throw FileOpenError();}
     FileHandle(const char16_t *s) : FileHandle(utf::as_str8(s)) {}
-    FileHandle(const char16_t *s, size_t len) : FileHandle(utf::as_str8(std::u16string_view(s, len))) {}
+    FileHandle(const char16_t *s, size_t len) : FileHandle(utf::as_str8(utf::std::u16string_view(s, len))) {}
 
-    bool open(const char16_t *s, size_t len) {return open(utf::as_str8(std::u16string_view(s, len)));}
+    bool open(const char16_t *s, size_t len) {return open(utf::as_str8(utf::std::u16string_view(s, len)));}
     bool open(const char16_t *s)             {return open(utf::as_str8(s));}
     bool open(const char *s, size_t len)
     {
