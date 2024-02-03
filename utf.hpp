@@ -61,6 +61,11 @@ namespace utf {
             basic_string_view(const char_type *s) : s(s), len(::std::char_traits<char_type>::length(s)) {}
             basic_string_view(const char_type *s, size_t len) : s(s), len(len) {}
             basic_string_view(const ::std::basic_string<char_type> &s) : s(s.data()), len(s.length()) {}
+#if defined __has_include // [https://gcc.gnu.org/onlinedocs/cpp/_005f_005fhas_005finclude.html <- google:‘__has_include’ <- https://stackoverflow.com/questions/68760101/why-some-c-feature-test-macros-require-header-inclusion <- google:‘gcc check string_view supported’]
+#  if __has_include (<string_view>)
+            basic_string_view(const ::std::basic_string_view<char_type> &s) : s(s.data()), len(s.length()) {}
+#  endif
+#endif
 
             typedef const char_type* const_iterator;
             const_iterator begin() const { return s; }
