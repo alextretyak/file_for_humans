@@ -2,6 +2,7 @@
 #include <cstdint> // for uint8_t
 #include "FileHandle.hpp"
 #include <memory> // for std::unique_ptr
+#include <string.h> // for memcmp and memchr [GCC]
 #include <assert.h>
 
 const size_t IFILE_DEFAULT_BUFFER_SIZE = 32*1024;
@@ -22,6 +23,7 @@ class IFile
     detail::FileHandle<true> fh;
     std::unique_ptr<uint8_t[]> buffer;
     size_t buffer_pos = 0, buffer_size = 0, buffer_capacity = IFILE_DEFAULT_BUFFER_SIZE;
+    size_t file_pos_of_buffer_start = 0;
     bool is_eof_reached = false;
 
     NOINLINE bool has_no_data_left()
@@ -34,6 +36,7 @@ class IFile
         if (buffer == nullptr)
             buffer.reset(new uint8_t[buffer_capacity]);
 
+        file_pos_of_buffer_start += buffer_size;
         buffer_size = fh.read(buffer.get(), buffer_capacity);
         if (buffer_size < buffer_capacity)
             is_eof_reached = true;
@@ -41,6 +44,12 @@ class IFile
         buffer_pos = 0;
 
         return buffer_size == 0;
+    }
+
+    static bool is_bom(const uint8_t *p)
+    {
+        uint8_t utf8bom[3] = {0xEF, 0xBB, 0xBF};
+        return memcmp(p, utf8bom, 3) == 0;
     }
 
 public:
@@ -52,6 +61,7 @@ public:
         fh.close();
         buffer_pos = 0;
         buffer_size = 0;
+        file_pos_of_buffer_start = 0;
         is_eof_reached = false;
     }
 
@@ -100,8 +110,53 @@ public:
     {
     }
 
-    std::string read_line()
+    std::string read_until(char delim, bool keep_delim = false)
     {
+        if (at_eof())
+            throw UnexpectedEOF();
+
+        // Skip the BOM at the beginning of the file, if present
+        if (file_pos_of_buffer_start == 0 && buffer_pos == 0)
+            if (buffer_size >= 3)
+                if (is_bom(buffer.get())) {
+                    if (buffer_size == 3)
+                        throw UnexpectedEOF();
+                    buffer_pos = 3;
+                }
+
+        // Scan buffer for delim
+        if (uint8_t *p = (uint8_t*)memchr(buffer.get() + buffer_pos, delim, buffer_size - buffer_pos)) {
+            size_t res_size = p - (buffer.get() + buffer_pos);
+            std::string res((char*)buffer.get() + buffer_pos, res_size + int(keep_delim));
+            buffer_pos += res_size + 1;
+            return res;
+        }
+
+        std::string res((char*)buffer.get() + buffer_pos, buffer_size - buffer_pos);
+        buffer_pos = buffer_size;
+        while (!has_no_data_left()) {
+            if (uint8_t *p = (uint8_t*)memchr(buffer.get(), delim, buffer_size)) {
+                res.append((char*)buffer.get(), p - buffer.get() + int(keep_delim));
+                buffer_pos += p - buffer.get() + 1;
+                return res;
+            }
+            res.append((char*)buffer.get(), buffer_size);
+            buffer_pos = buffer_size;
+        }
+        return res;
+    }
+
+    std::string read_line(bool keep_newline = false)
+    {
+        std::string r = read_until('\n', keep_newline);
+        if (!keep_newline) {
+            if (!r.empty() && r.back() == '\r')
+                r.pop_back();
+        }
+        else
+            if (r.back() == '\n' && r.length() >= 2 && r[r.length() - 2] == '\r')
+                r.erase(r.length() - 2, 1);
+        return r;
     }
 
     std::vector<uint8_t> read_bytes()
