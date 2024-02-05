@@ -169,8 +169,20 @@ public:
             return std::string(); // when the EOF is reached, this function returns an empty string instead of throwing an UnexpectedEOF exception
         }
 
+        // Skip the BOM at the beginning of the file, if present
+        if (file_pos_of_buffer_start == 0 && buffer_pos == 0)
+            if (buffer_size >= 3)
+                if (is_bom(buffer.get())) {
+                    if (buffer_size == 3) {
+                        eof_indicator = true;
+                        return std::string(); // when the EOF is reached, this function returns an empty string instead of throwing an UnexpectedEOF exception
+                    }
+                    buffer_pos = 3;
+                }
+
         std::string r = read_until('\n', true);
-        if (r.empty() || r.back() != '\n') {
+        assert(!r.empty()); // the above code guarantees that `r` cannot be empty here
+        if (r.back() != '\n') {
             assert(is_eof_reached && buffer_pos == buffer_size);
             eof_indicator = true;
             return r;
