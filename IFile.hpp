@@ -25,6 +25,7 @@ class IFile
     size_t buffer_pos = 0, buffer_size = 0, buffer_capacity = IFILE_DEFAULT_BUFFER_SIZE;
     size_t file_pos_of_buffer_start = 0;
     bool is_eof_reached = false;
+    bool eof_indicator = false; // >[https://www.open-std.org/jtc1/sc22/wg14/www/docs/n3096.pdf <- https://en.wikipedia.org/wiki/C23_(C_standard_revision)]:‘The `feof` function tests the end-of-file indicator’
 
     NOINLINE bool has_no_data_left()
     {
@@ -63,6 +64,7 @@ public:
         buffer_size = 0;
         file_pos_of_buffer_start = 0;
         is_eof_reached = false;
+        eof_indicator = false;
     }
 
     void set_buffer_size(size_t sz)
@@ -93,6 +95,7 @@ public:
     */
     bool eof_passed()
     {
+        return eof_indicator;
     }
 
     uint8_t read_byte()
@@ -155,6 +158,31 @@ public:
         }
         else
             if (r.back() == '\n' && r.length() >= 2 && r[r.length() - 2] == '\r')
+                r.erase(r.length() - 2, 1);
+        return r;
+    }
+
+    std::string read_line_reae(bool keep_newline = false) // ‘r’‘e’‘a’‘e’ means ‘r’eturns ‘e’mpty [string] (‘a’t ‘e’nd of file);
+    {                                                     // `read_line_reae()` corresponds to `std::getline()` in C++,
+        if (at_eof()) {                                   // `read_line_reae(true)` corresponds to `readline()` in Python and to `read_line()` in Rust.
+            eof_indicator = true;
+            return std::string(); // when the EOF is reached, this function returns an empty string instead of throwing an UnexpectedEOF exception
+        }
+
+        std::string r = read_until('\n', true);
+        if (r.empty() || r.back() != '\n') {
+            assert(is_eof_reached && buffer_pos == buffer_size);
+            eof_indicator = true;
+            return r;
+        }
+        assert(r.back() == '\n');
+        if (!keep_newline) {
+            r.pop_back();
+            if (!r.empty() && r.back() == '\r')
+                r.pop_back();
+        }
+        else
+            if (r.length() >= 2 && r[r.length() - 2] == '\r')
                 r.erase(r.length() - 2, 1);
         return r;
     }
