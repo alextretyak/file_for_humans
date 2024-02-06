@@ -14,6 +14,17 @@ int main()
         return r;
     });
 
+    test_ffh([](IFile &f) {
+        f.set_buffer_size(4 * 1024);
+        uint32_t r = 0;
+        while (!f.at_eof()) {
+            uint32_t d;
+            f.read_struct(d);
+            r += d;
+        }
+        return r;
+    }, "with 4KiB buffer");
+
     test_c([](FILE *f) {
         uint32_t r = 0, d;
         while (fread(&d, 4, 1, f) == 1)

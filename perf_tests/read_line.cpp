@@ -43,6 +43,16 @@ int main()
         return total_len * 1000 / words_count;
     }, "via read_byte()", "unixdict.txt");
 
+    test_ffh([](IFile &f) {
+        f.set_buffer_size(4 * 1024);
+        uint32_t words_count = 0, total_len = 0;
+        while (!f.at_eof()) {
+            words_count++;
+            total_len += f.read_line().length();
+        }
+        return total_len * 1000 / words_count;
+    }, "with 4KiB buffer", "unixdict.txt");
+
     test_c([](FILE *f) {
         uint32_t words_count = 0, total_len = 0;
         char s[32];
