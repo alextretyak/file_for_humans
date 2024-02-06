@@ -23,7 +23,7 @@ class IFile
     detail::FileHandle<true> fh;
     std::unique_ptr<uint8_t[]> buffer;
     size_t buffer_pos = 0, buffer_size = 0, buffer_capacity = IFILE_DEFAULT_BUFFER_SIZE;
-    size_t file_pos_of_buffer_start = 0;
+    uint64_t file_pos_of_buffer_start = 0;
     bool is_eof_reached = false;
     bool eof_indicator = false; // >[https://www.open-std.org/jtc1/sc22/wg14/www/docs/n3096.pdf <- https://en.wikipedia.org/wiki/C23_(C_standard_revision)]:‘The `feof` function tests the end-of-file indicator’
 
@@ -209,5 +209,28 @@ public:
 
     std::vector<uint8_t> read_bytes_at_most()
     {
+    }
+
+    void read_bytes(uint8_t *p, size_t count)
+    {
+        if (at_eof())
+            throw UnexpectedEOF();
+
+        while (true) {
+            size_t n = (std::min)(buffer_size - buffer_pos, count);
+            memcpy(p, buffer.get() + buffer_pos, n);
+            buffer_pos += n;
+            count -= n;
+            if (count == 0)
+                return;
+            if (has_no_data_left())
+                throw UnexpectedEOF();
+            p += n;
+        }
+    }
+
+    template <typename Struct> void read_struct(Struct &s)
+    {
+        read_bytes((uint8_t*)&s, sizeof(Struct));
     }
 };

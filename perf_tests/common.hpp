@@ -70,6 +70,7 @@ template <class Func> void test_ffh(Func &&func)
         time = (std::min)(time, perf_counter() - start);
     }
     ffh_time = time;
+    printf("\n");
     printf("--- ffh ---\n");
     printf("                                          result: %u\n", r);
     printf("time: %.3f\n", time);
@@ -88,7 +89,7 @@ template <class Func> void test_c(Func &&func, const char *test_name = nullptr)
     }
     printf("\n");
     if (test_name != nullptr)
-        printf("--- C (%s) ---\n", test_name);
+        printf("--- C %s ---\n", test_name);
     else
         printf("--- C ---\n");
     printf("                                          result: %u\n", r);
@@ -108,7 +109,7 @@ template <class Func> void test_cpp(Func &&func, const char *test_name = nullptr
     }
     printf("\n");
     if (test_name != nullptr)
-        printf("--- C++ (%s) ---\n", test_name);
+        printf("--- C++ %s ---\n", test_name);
     else
         printf("--- C++ ---\n");
     printf("                                          result: %u\n", r);
