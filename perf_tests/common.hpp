@@ -58,12 +58,13 @@ public:
 };
 
 double ffh_time;
+int tests_count = 10;
 
 template <class Body> void test(const char *test_base_name, Body &&body, const char *test_name)
 {
     double time = DBL_MAX;
     uint32_t r;
-    for (int t = 0; t < 10; t++)
+    for (int t = 0; t < tests_count; t++)
         body(r, time);
 
     printf("\n");
@@ -73,26 +74,26 @@ template <class Body> void test(const char *test_base_name, Body &&body, const c
         printf("--- %s ---\n", test_base_name);
     printf("                                          result: %u\n", r);
     printf("time: %.3f\n", time);
-    if (strcmp(test_base_name, "ffh") == 0)
+    if (strcmp(test_base_name, "ffh") == 0 && test_name == nullptr)
         ffh_time = time;
     else
         printf("times slower than ffh: %.2f\n", time / ffh_time);
 }
 
-template <class Func> void test_ffh(Func &&func)
+template <class Func> void test_ffh(Func &&func, const char *test_name = nullptr, const char *test_file_name = "test.dat")
 {
     test("ffh", [&](uint32_t &r, double &time) {
-        IFile f("test.dat");
+        IFile f(test_file_name);
         auto start = perf_counter();
         r = func(f);
         time = (std::min)(time, perf_counter() - start);
-    }, nullptr);
+    }, test_name);
 }
 
-template <class Func> void test_c(Func &&func, const char *test_name = nullptr)
+template <class Func> void test_c(Func &&func, const char *test_name = nullptr, const char *test_file_name = "test.dat")
 {
     test("C", [&](uint32_t &r, double &time) {
-        FILE *f = fopen("test.dat", "rb");
+        FILE *f = fopen(test_file_name, "rb");
         auto start = perf_counter();
         r = func(f);
         time = (std::min)(time, perf_counter() - start);
@@ -100,10 +101,10 @@ template <class Func> void test_c(Func &&func, const char *test_name = nullptr)
     }, test_name);
 }
 
-template <class Func> void test_cpp(Func &&func, const char *test_name = nullptr)
+template <class Func> void test_cpp(Func &&func, const char *test_name = nullptr, const char *test_file_name = "test.dat")
 {
     test("C++", [&](uint32_t &r, double &time) {
-        std::ifstream f("test.dat", std::ios::binary);
+        std::ifstream f(test_file_name, std::ios::binary);
         auto start = perf_counter();
         r = func(f);
         time = (std::min)(time, perf_counter() - start);

@@ -1,3 +1,4 @@
+#pragma once
 #include <vector>
 #include <cstdint> // for uint8_t
 #include "FileHandle.hpp"
