@@ -53,4 +53,37 @@ int main()
             r += f.get();
         return r;
     }, "with at_eof() simulation via peek()");
+
+    test_c([](FILE *f) {
+        setvbuf(f, NULL, _IOFBF, 32 * 1024);
+        uint32_t r = 0;
+        for (int c; (c = fgetc(f)) != EOF;)
+            r += c;
+        return r;
+    }, "with 32KiB buffer");
+
+    test_c([](FILE *f) {
+        setvbuf(f, NULL, _IOFBF, 1024 * 1024);
+        uint32_t r = 0;
+        for (int c; (c = fgetc(f)) != EOF;)
+            r += c;
+        return r;
+    }, "with 1MiB buffer");
+
+    test_c([](FILE *f) {
+        setvbuf(f, NULL, _IOFBF, 256);
+        uint32_t r = 0;
+        for (int c; (c = fgetc(f)) != EOF;)
+            r += c;
+        return r;
+    }, "with 256B buffer");
+
+    test_cpp([](std::ifstream &f) {
+        static char buffer[32 * 1024];
+        f.rdbuf()->pubsetbuf(buffer, sizeof(buffer));
+        uint32_t r = 0;
+        for (int c; (c = f.get()) != std::ifstream::traits_type::eof();)
+            r += c;
+        return r;
+    }, "with 32KiB buffer");
 }
