@@ -59,60 +59,53 @@ public:
 
 double ffh_time;
 
-template <class Func> void test_ffh(Func &&func)
+template <class Body> void test(const char *test_base_name, Body &&body, const char *test_name)
 {
     double time = DBL_MAX;
     uint32_t r;
-    for (int t = 0; t < 10; t++) {
+    for (int t = 0; t < 10; t++)
+        body(r, time);
+
+    printf("\n");
+    if (test_name != nullptr)
+        printf("--- %s %s ---\n", test_base_name, test_name);
+    else
+        printf("--- %s ---\n", test_base_name);
+    printf("                                          result: %u\n", r);
+    printf("time: %.3f\n", time);
+    if (strcmp(test_base_name, "ffh") == 0)
+        ffh_time = time;
+    else
+        printf("times slower than ffh: %.2f\n", time / ffh_time);
+}
+
+template <class Func> void test_ffh(Func &&func)
+{
+    test("ffh", [&](uint32_t &r, double &time) {
         IFile f("test.dat");
         auto start = perf_counter();
         r = func(f);
         time = (std::min)(time, perf_counter() - start);
-    }
-    ffh_time = time;
-    printf("\n");
-    printf("--- ffh ---\n");
-    printf("                                          result: %u\n", r);
-    printf("time: %.3f\n", time);
+    }, nullptr);
 }
 
 template <class Func> void test_c(Func &&func, const char *test_name = nullptr)
 {
-    double time = DBL_MAX;
-    uint32_t r;
-    for (int t = 0; t < 10; t++) {
+    test("C", [&](uint32_t &r, double &time) {
         FILE *f = fopen("test.dat", "rb");
         auto start = perf_counter();
         r = func(f);
         time = (std::min)(time, perf_counter() - start);
         fclose(f);
-    }
-    printf("\n");
-    if (test_name != nullptr)
-        printf("--- C %s ---\n", test_name);
-    else
-        printf("--- C ---\n");
-    printf("                                          result: %u\n", r);
-    printf("time: %.3f\n", time);
-    printf("times slower than ffh: %.2f\n", time / ffh_time);
+    }, test_name);
 }
 
 template <class Func> void test_cpp(Func &&func, const char *test_name = nullptr)
 {
-    double time = DBL_MAX;
-    uint32_t r;
-    for (int t = 0; t < 10; t++) {
+    test("C++", [&](uint32_t &r, double &time) {
         std::ifstream f("test.dat", std::ios::binary);
         auto start = perf_counter();
         r = func(f);
         time = (std::min)(time, perf_counter() - start);
-    }
-    printf("\n");
-    if (test_name != nullptr)
-        printf("--- C++ %s ---\n", test_name);
-    else
-        printf("--- C++ ---\n");
-    printf("                                          result: %u\n", r);
-    printf("time: %.3f\n", time);
-    printf("times slower than ffh: %.2f\n", time / ffh_time);
+    }, test_name);
 }
