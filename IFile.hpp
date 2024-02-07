@@ -217,6 +217,23 @@ public:
         if (at_eof())
             throw UnexpectedEOF();
 
+        if (count > buffer_capacity) { // optimize large reads (avoid extra `read()` syscalls)
+            // First of all, copy all of the remaining bytes in the buffer
+            size_t n = buffer_size - buffer_pos;
+            assert(count >= n);
+            memcpy(p, buffer.get() + buffer_pos, n);
+            count -= n;
+            p += n;
+
+            // Read the rest in a single [or at least a minimal number of] `read()` syscall(s)
+            if (fh.read(p, count) < count)
+                throw UnexpectedEOF();
+
+            file_pos_of_buffer_start += buffer_size + count;
+            buffer_pos = buffer_size = 0;
+            return;
+        }
+
         while (true) {
             size_t n = (std::min)(buffer_size - buffer_pos, count);
             memcpy(p, buffer.get() + buffer_pos, n);
