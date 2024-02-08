@@ -12,6 +12,7 @@ const size_t IFILE_DEFAULT_BUFFER_SIZE = 32*1024;
 class IFileBufferAlreadyAllocated {};
 class UnexpectedEOF {};
 class StartsWithMustBeCalledAtTheBeginningOfTheFile {};
+class IFileUnicodeDecodeError {};
 
 /*
 H‘Naming things is hard’
@@ -54,6 +55,21 @@ class IFile
     {
         uint8_t utf8bom[3] = {0xEF, 0xBB, 0xBF};
         return memcmp(p, utf8bom, 3) == 0;
+    }
+
+    bool skip_bom(bool throw_ = true)
+    {
+        if (file_pos_of_buffer_start == 0 && buffer_pos == 0)
+            if (buffer_size >= 3)
+                if (is_bom(buffer.get())) {
+                    if (buffer_size == 3) {
+                        if (throw_)
+                            throw UnexpectedEOF();
+                        return true;
+                    }
+                    buffer_pos = 3;
+                }
+        return false;
     }
 
 public:
@@ -129,13 +145,7 @@ public:
             throw UnexpectedEOF();
 
         // Skip the BOM at the beginning of the file, if present
-        if (file_pos_of_buffer_start == 0 && buffer_pos == 0)
-            if (buffer_size >= 3)
-                if (is_bom(buffer.get())) {
-                    if (buffer_size == 3)
-                        throw UnexpectedEOF();
-                    buffer_pos = 3;
-                }
+        skip_bom();
 
         // Scan buffer for delim
         if (uint8_t *p = (uint8_t*)memchr(buffer.get() + buffer_pos, delim, buffer_size - buffer_pos)) {
@@ -180,15 +190,10 @@ public:
         }
 
         // Skip the BOM at the beginning of the file, if present
-        if (file_pos_of_buffer_start == 0 && buffer_pos == 0)
-            if (buffer_size >= 3)
-                if (is_bom(buffer.get())) {
-                    if (buffer_size == 3) {
-                        eof_indicator = true;
-                        return std::string(); // when the EOF is reached, this function returns an empty string instead of throwing an UnexpectedEOF exception
-                    }
-                    buffer_pos = 3;
-                }
+        if (skip_bom(false)) {
+            eof_indicator = true;
+            return std::string(); // when the EOF is reached, this function returns an empty string instead of throwing an UnexpectedEOF exception
+        }
 
         std::string r = read_until('\n', true);
         assert(!r.empty()); // the above code guarantees that `r` cannot be empty here
@@ -207,6 +212,28 @@ public:
             if (r.length() >= 2 && r[r.length() - 2] == '\r')
                 r.erase(r.length() - 2, 1);
         return r;
+    }
+
+    uint32_t read_char()
+    {
+        if (at_eof())
+            throw UnexpectedEOF();
+
+        // Skip the BOM at the beginning of the file, if present
+        skip_bom();
+
+        uint8_t uchar[6];
+        uchar[0] = buffer[buffer_pos++];
+        uint8_t extraBytesToRead = utf::trailingBytesForUTF8[uchar[0]];
+        read_bytes(uchar + 1, extraBytesToRead);
+
+        bool ok = false;
+        const char *source = (char*)uchar;
+        char32_t ch = utf::decode(source, source + 1 + extraBytesToRead, ok);
+        if (!ok)
+            throw IFileUnicodeDecodeError();
+        assert(source == (char*)uchar + 1 + extraBytesToRead);
+        return ch;
     }
 
     std::vector<uint8_t> read_bytes()
