@@ -11,6 +11,7 @@ const size_t IFILE_DEFAULT_BUFFER_SIZE = 32*1024;
 
 class IFileBufferAlreadyAllocated {};
 class UnexpectedEOF {};
+class StartsWithMustBeCalledAtTheBeginningOfTheFile {};
 
 /*
 H‘Naming things is hard’
@@ -272,5 +273,17 @@ public:
         std::array<uint8_t, count> r;
         read_bytes(r.data(), count);
         return r;
+    }
+
+    bool starts_with(const char *s) // s — signature/‘sequence of chars’
+    {
+        if (!(file_pos_of_buffer_start == 0 && buffer_pos == 0))
+            throw StartsWithMustBeCalledAtTheBeginningOfTheFile();
+
+        if (at_eof())
+            return false;
+
+        size_t len = strlen(s);
+        return buffer_size >= len && memcmp(buffer.get(), s, len) == 0;
     }
 };
