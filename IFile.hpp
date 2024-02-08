@@ -99,6 +99,13 @@ public:
         return eof_indicator;
     }
 
+    uint8_t peek_byte()
+    {
+        if (at_eof())
+            throw UnexpectedEOF();
+        return buffer[buffer_pos];
+    }
+
     uint8_t read_byte()
     {
         if (at_eof())
