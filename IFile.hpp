@@ -248,12 +248,12 @@ public:
     {
     }
 
-    void read_bytes(uint8_t *p, size_t count)
+    template <bool check_for_large_read = true> void read_bytes(uint8_t *p, size_t count)
     {
         if (at_eof())
             throw UnexpectedEOF();
 
-        if (count > buffer_capacity) { // optimize large reads (avoid extra `read()` syscalls)
+        if (check_for_large_read && count > buffer_capacity) { // optimize large reads (avoid extra `read()` syscalls)
             // First of all, copy all of the remaining bytes in the buffer
             size_t n = buffer_size - buffer_pos;
             assert(count >= n);
@@ -283,9 +283,14 @@ public:
         }
     }
 
+    template <size_t count> void read_bytes(uint8_t *p)
+    {
+        read_bytes<(count > 512)>(p, count);
+    }
+
     template <typename Struct> void read_struct(Struct &s)
     {
-        read_bytes((uint8_t*)&s, sizeof(Struct));
+        read_bytes<sizeof(Struct)>((uint8_t*)&s);
     }
 
     std::vector<uint8_t> read_bytes(size_t count)
@@ -298,7 +303,7 @@ public:
     template <size_t count> std::array<uint8_t, count> read_bytes()
     {
         std::array<uint8_t, count> r;
-        read_bytes(r.data(), count);
+        read_bytes<count>(r.data());
         return r;
     }
 
