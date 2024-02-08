@@ -1,5 +1,6 @@
 #pragma once
 #include <vector>
+#include <array>
 #include <cstdint> // for uint8_t
 #include "FileHandle.hpp"
 #include <memory> // for std::unique_ptr
@@ -257,5 +258,19 @@ public:
     template <typename Struct> void read_struct(Struct &s)
     {
         read_bytes((uint8_t*)&s, sizeof(Struct));
+    }
+
+    std::vector<uint8_t> read_bytes(size_t count)
+    {
+        std::vector<uint8_t> r(count);
+        read_bytes(r.data(), count);
+        return r;
+    }
+
+    template <size_t count> std::array<uint8_t, count> read_bytes()
+    {
+        std::array<uint8_t, count> r;
+        read_bytes(r.data(), count);
+        return r;
     }
 };
