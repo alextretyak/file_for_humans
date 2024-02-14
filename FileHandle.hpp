@@ -9,6 +9,7 @@
 #include <unistd.h> // for `read()`
 #endif
 #include "utf.hpp"
+#include "UnixNanotime.hpp"
 
 #ifdef __GNUC__
 #define NOINLINE __attribute__((noinline))
@@ -23,6 +24,8 @@ class WrongFileNameStr {};
 class FileIsAlreadyOpened {};
 class AttemptToReadAClosedFile {};
 class IOError {};
+class AttemptToGetTimeOfAClosedFile {};
+class GetFileTimeFailed {};
 
 namespace detail
 {
@@ -73,6 +76,8 @@ HANDLE handle;
             handle = CreateFileW((wchar_t*)s, GENERIC_WRITE, 0              , NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
         return handle != INVALID_HANDLE_VALUE;
     }
+
+    bool is_valid() {return handle != INVALID_HANDLE_VALUE;}
 
     size_t read(void *buf, size_t sz)
     {
@@ -146,6 +151,8 @@ HANDLE handle;
         return fd != -1;
     }
 
+    bool is_valid() {return fd != -1;}
+
     size_t read(void *buf, size_t sz)
     {
         if (fd == -1)
@@ -175,5 +182,41 @@ HANDLE handle;
 #endif
 
     ~FileHandle() {close();}
+
+    // File times
+private:
+    UnixNanotime creation_time = UnixNanotime::uninitialized(),
+               last_write_time = UnixNanotime::uninitialized();
+#ifdef _WIN32
+    static const int64_t _1601_TO_1970 = 116444736000000000i64; // number of 100 nanosecond units from 1/1/1601 to 1/1/1970
+
+    void get_file_times()
+    {
+        if (!is_valid())
+            throw AttemptToGetTimeOfAClosedFile();
+
+        uint64_t cfiletime, mfiletime;
+        if (GetFileTime(handle, (FILETIME*)&cfiletime, NULL, (FILETIME*)&mfiletime) == 0)
+            throw GetFileTimeFailed();
+
+        creation_time   = UnixNanotime::from_nanotime_t(int64_t(cfiletime - _1601_TO_1970) * 100);
+        last_write_time = UnixNanotime::from_nanotime_t(int64_t(mfiletime - _1601_TO_1970) * 100);
+    }
+
+public:
+    UnixNanotime get_creation_time()
+    {
+        if (creation_time == UnixNanotime::uninitialized())
+            get_file_times();
+        return creation_time;
+    }
+    UnixNanotime get_last_write_time()
+    {
+        if (last_write_time == UnixNanotime::uninitialized())
+            get_file_times();
+        return last_write_time;
+    }
+#else
+#endif
 };
 }

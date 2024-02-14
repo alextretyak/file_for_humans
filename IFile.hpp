@@ -318,4 +318,7 @@ public:
         size_t len = strlen(s);
         return buffer_size >= len && memcmp(buffer.get(), s, len) == 0;
     }
+
+    UnixNanotime   get_creation_time() {return   fh.get_creation_time();}
+    UnixNanotime get_last_write_time() {return fh.get_last_write_time();}
 };
