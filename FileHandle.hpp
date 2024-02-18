@@ -10,6 +10,7 @@
 #endif
 #include "utf.hpp"
 #include "UnixNanotime.hpp"
+#include "UniqueHandle.hpp"
 
 #ifdef __GNUC__
 #define NOINLINE __attribute__((noinline))
@@ -40,20 +41,12 @@ public:
     bool  open(const std::u16string &s) {return open(s.c_str(), s.length());}
 
 #ifdef _WIN32
-HANDLE handle;
-    FileHandle(FileHandle &&fh) : handle(fh.handle) {fh.handle = INVALID_HANDLE_VALUE;}
-    FileHandle &operator=(FileHandle &&fh)
-    {
-        close();
-        handle = fh.handle;
-        fh.handle = INVALID_HANDLE_VALUE;
-        return *this;
-    }
+    UniqueHandle<HANDLE, INVALID_HANDLE_VALUE> handle;
 
-    FileHandle() : handle(INVALID_HANDLE_VALUE) {}
+    FileHandle() {}
     FileHandle(const char *s, size_t len) : FileHandle(utf::as_u16(utf::std::string_view(s, len))) {}
-    FileHandle(const char16_t *s, size_t len) : handle(INVALID_HANDLE_VALUE) {if (!open(s, len)) throw FileOpenError();}
-    FileHandle(const char16_t *s) : handle(INVALID_HANDLE_VALUE) {if (!open(s)) throw FileOpenError();}
+    FileHandle(const char16_t *s, size_t len) {if (!open(s, len)) throw FileOpenError();}
+    FileHandle(const char16_t *s) {if (!open(s)) throw FileOpenError();}
     FileHandle(const char *s) : FileHandle(utf::as_u16(s)) {}
 
     bool open(const char *s, size_t len) {return open(utf::as_u16(utf::std::string_view(s, len)));}
@@ -114,19 +107,11 @@ HANDLE handle;
         }
     }
 #else
-    int fd;
-    FileHandle(FileHandle &&fh) : fd(fh.fd) {fh.fd = -1;}
-    FileHandle &operator=(FileHandle &&fh)
-    {
-        close();
-        fd = fh.fd;
-        fh.fd = -1;
-        return *this;
-    }
+    UniqueHandle<int, -1> fd;
 
-    FileHandle() : fd(-1) {}
-    FileHandle(const char *s) : fd(-1) {if (!open(s)) throw FileOpenError();}
-    FileHandle(const char *s, size_t len) : fd(-1) {if (!open(s, len)) throw FileOpenError();}
+    FileHandle() {}
+    FileHandle(const char *s) {if (!open(s)) throw FileOpenError();}
+    FileHandle(const char *s, size_t len) {if (!open(s, len)) throw FileOpenError();}
     FileHandle(const char16_t *s) : FileHandle(utf::as_str8(s)) {}
     FileHandle(const char16_t *s, size_t len) : FileHandle(utf::as_str8(utf::std::u16string_view(s, len))) {}
 
@@ -180,6 +165,16 @@ HANDLE handle;
         }
     }
 #endif
+#if !defined(_MSC_VER) || _MSC_VER > 1800 // unfortunately, MSVC 2013 doesn't support defaulted move constructors
+    FileHandle(FileHandle &&) = default;
+#else
+    FileHandle(FileHandle &&fh) : handle(std::move(fh.handle)), creation_time(fh.creation_time), last_write_time(fh.last_write_time) {}
+#endif
+    FileHandle &operator=(FileHandle &&fh)
+    {
+        move_assign(this, std::move(fh));
+        return *this;
+    }
 
     ~FileHandle() {close();}
 
