@@ -7,6 +7,7 @@
 #else
 #include <fcntl.h> // for `open()`
 #include <unistd.h> // for `read()`
+#include <sys/stat.h>
 #endif
 #include "utf.hpp"
 #include "UnixNanotime.hpp"
@@ -27,6 +28,8 @@ class AttemptToReadAClosedFile {};
 class IOError {};
 class AttemptToGetTimeOfAClosedFile {};
 class GetFileTimeFailed {};
+class GetCreationTimeIsNotImplemented {};
+class FStatFailed {};
 
 namespace detail
 {
@@ -212,6 +215,29 @@ public:
         return last_write_time;
     }
 #else
+    void get_last_write_time_and_file_size()
+    {
+        if (!is_valid())
+            throw AttemptToGetTimeOfAClosedFile();
+
+        struct stat st;
+        if (fstat(fd, &st) != 0)
+            throw FStatFailed();
+
+        last_write_time = UnixNanotime::from_nanotime_t(st.st_mtim.tv_sec * 1000000000 + st.st_mtim.tv_nsec);
+    }
+
+public:
+    UnixNanotime get_creation_time()
+    {
+        throw GetCreationTimeIsNotImplemented();
+    }
+    UnixNanotime get_last_write_time()
+    {
+        if (last_write_time == UnixNanotime::uninitialized())
+            get_last_write_time_and_file_size();
+        return last_write_time;
+    }
 #endif
 };
 }
