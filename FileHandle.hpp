@@ -30,6 +30,7 @@ class AttemptToGetTimeOfAClosedFile {};
 class GetFileTimeFailed {};
 class GetCreationTimeIsNotImplemented {};
 class FStatFailed {};
+class AttemptToGetFileSizeOfAClosedFile {};
 
 namespace detail
 {
@@ -171,7 +172,7 @@ public:
 #if !defined(_MSC_VER) || _MSC_VER > 1800 // unfortunately, MSVC 2013 doesn't support defaulted move constructors
     FileHandle(FileHandle &&) = default;
 #else
-    FileHandle(FileHandle &&fh) : handle(std::move(fh.handle)), creation_time(fh.creation_time), last_write_time(fh.last_write_time) {}
+    FileHandle(FileHandle &&fh) : handle(std::move(fh.handle)), creation_time(fh.creation_time), last_write_time(fh.last_write_time), file_size(fh.file_size) {}
 #endif
     FileHandle &operator=(FileHandle &&fh)
     {
@@ -181,10 +182,11 @@ public:
 
     ~FileHandle() {close();}
 
-    // File times
+    // File times and file size
 private:
     UnixNanotime creation_time = UnixNanotime::uninitialized(),
                last_write_time = UnixNanotime::uninitialized();
+    int64_t file_size = -1;
 #ifdef _WIN32
     static const int64_t _1601_TO_1970 = 116444736000000000i64; // number of 100 nanosecond units from 1/1/1601 to 1/1/1970
 
@@ -214,6 +216,18 @@ public:
             get_file_times();
         return last_write_time;
     }
+
+    int64_t get_file_size()
+    {
+        if (file_size == -1) {
+            if (!is_valid())
+                throw AttemptToGetFileSizeOfAClosedFile();
+
+            if (GetFileSizeEx(handle, (PLARGE_INTEGER)&file_size) == 0)
+                file_size = -2;
+        }
+        return file_size;
+    }
 #else
     void get_last_write_time_and_file_size()
     {
@@ -225,6 +239,7 @@ public:
             throw FStatFailed();
 
         last_write_time = UnixNanotime::from_nanotime_t(st.st_mtim.tv_sec * 1000000000 + st.st_mtim.tv_nsec);
+        file_size = S_ISREG(st.st_mode) ? st.st_size : -2;
     }
 
 public:
@@ -237,6 +252,13 @@ public:
         if (last_write_time == UnixNanotime::uninitialized())
             get_last_write_time_and_file_size();
         return last_write_time;
+    }
+
+    int64_t get_file_size()
+    {
+        if (file_size == -1)
+            get_last_write_time_and_file_size();
+        return file_size;
     }
 #endif
 };

@@ -93,6 +93,11 @@ public:
         buffer_capacity = sz;
     }
 
+    int64_t get_file_size()
+    {
+        return fh.get_file_size();
+    }
+
     /*
     `at_eof()` function works like `eof()` in Pascal, i.e. it returns true if the file is at the end.
     The name `at_the_end()` for this function has been rejected as it is longer, and the name `at_eof()` is still quite correct:
