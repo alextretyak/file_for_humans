@@ -249,8 +249,33 @@ public:
     {
     }
 
-    std::vector<uint8_t> read_bytes_at_most()
+    size_t read_bytes_at_most(uint8_t *p, size_t count)
     {
+        if (at_eof())
+            return 0;
+
+        uint8_t *initial_p = p;
+
+        while (true) {
+            size_t n = (std::min)(buffer_size - buffer_pos, count);
+            memcpy(p, buffer.get() + buffer_pos, n);
+            p += n;
+            buffer_pos += n;
+            count -= n;
+            if (count == 0)
+                return p - initial_p;
+            if (has_no_data_left()) {
+                eof_indicator = true;
+                return p - initial_p;
+            }
+        }
+    }
+
+    std::vector<uint8_t> read_bytes_at_most(size_t count)
+    {
+        std::vector<uint8_t> r(count);
+        r.resize(read_bytes_at_most(r.data(), count));
+        return r;
     }
 
     template <bool check_for_large_read = true> void read_bytes(uint8_t *p, size_t count)
