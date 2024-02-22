@@ -13,6 +13,9 @@ class IFileBufferAlreadyAllocated {};
 class UnexpectedEOF {};
 class StartsWithMustBeCalledAtTheBeginningOfTheFile {};
 class IFileUnicodeDecodeError {};
+class ReadBytesMustBeCalledAtTheBeginningOfTheFile {};
+class FileIsTooLargeToFitInMemory {};
+class OSReportedIncorrectFileSize {};
 
 /*
 H‘Naming things is hard’
@@ -243,6 +246,28 @@ public:
 
     std::vector<uint8_t> read_bytes()
     {
+        if (!(file_pos_of_buffer_start == 0 && buffer_pos == 0 && buffer_size == 0))
+            throw ReadBytesMustBeCalledAtTheBeginningOfTheFile();
+
+        int64_t file_size = get_file_size();
+        if (file_size != -2) {
+            if (file_size > SIZE_MAX)
+                throw FileIsTooLargeToFitInMemory();
+            size_t file_sz = (size_t)file_size;
+            std::vector<uint8_t> r(file_sz);
+            if (fh.read(r.data(), file_sz) != file_sz)
+                throw OSReportedIncorrectFileSize();
+            file_pos_of_buffer_start = file_size;
+            return r;
+        }
+        else { // file size is unknown, so read via buffer
+            std::vector<uint8_t> r;
+            while (!at_eof()) {
+                r.insert(r.end(), buffer.get(), buffer.get() + buffer_size);
+                buffer_pos = buffer_size;
+            }
+            return r;
+        }
     }
 
     std::vector<uint8_t> read_bytes_to_end()
