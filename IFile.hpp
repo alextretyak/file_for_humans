@@ -13,6 +13,7 @@ class IFileBufferAlreadyAllocated {};
 class UnexpectedEOF {};
 class StartsWithMustBeCalledAtTheBeginningOfTheFile {};
 class IFileUnicodeDecodeError {};
+class ReadTextMustBeCalledAtTheBeginningOfTheFile {};
 class ReadBytesMustBeCalledAtTheBeginningOfTheFile {};
 class FileIsTooLargeToFitInMemory {};
 class OSReportedIncorrectFileSize {};
@@ -73,6 +74,26 @@ class IFile
                     buffer_pos = 3;
                 }
         return false;
+    }
+
+    static void handle_newlines(std::string &s)
+    {
+        // Replace all "\r\n" with "\n"
+        size_t cr_pos = s.find('\r');
+        if (cr_pos != std::string::npos) {
+            char *dest = const_cast<char *>(s.c_str()) + cr_pos;
+            const char *src = dest + 1, *end = s.c_str() + s.size();
+            while (src < end) {
+                if (*src == '\r' && src[1] == '\n') {
+                    src++;
+                    continue;
+                }
+                *dest = *src;
+                dest++;
+                src++;
+            }
+            s.resize(dest - s.c_str());
+        }
     }
 
 public:
@@ -146,10 +167,61 @@ public:
 
     std::string read_text() // reads whole file and returns its contents as a string; only works if the file pointer is at the beginning of the file (`read_text_to_end()` has no such limitation)
     {
+        if (!(file_pos_of_buffer_start == 0 && buffer_pos == 0 && buffer_size == 0))
+            throw ReadTextMustBeCalledAtTheBeginningOfTheFile();
+
+        std::string file_str;
+        int64_t file_size = get_file_size();
+        if (file_size != -2) {
+            if (file_size > SIZE_MAX)
+                throw FileIsTooLargeToFitInMemory();
+            size_t file_sz = (size_t)file_size;
+            file_str.resize(file_sz);
+            if (fh.read((char*)file_str.data(), file_sz) != file_sz)
+                throw OSReportedIncorrectFileSize();
+            file_pos_of_buffer_start = file_size;
+
+            // Remove the BOM at the beginning of the file, if present
+            if (file_str.length() >= 3 && is_bom((uint8_t*)file_str.data()))
+                file_str.erase(0, 3);
+        }
+        else { // file size is unknown, so read via buffer
+            if (!has_no_data_left()) {
+                // Skip the BOM at the beginning of the file, if present
+                if (buffer_size >= 3 && is_bom(buffer.get()))
+                    buffer_pos = 3;
+
+                // Read the rest
+                do {
+                    file_str.append(buffer.get() + buffer_pos, buffer.get() + buffer_size);
+                    buffer_pos = buffer_size;
+                } while (!has_no_data_left());
+            }
+        }
+
+        handle_newlines(file_str);
+        return file_str;
     }
 
     std::string read_text_to_end() // the method name was inspired by [https://doc.rust-lang.org/std/io/trait.Read.html#method.read_to_end]
     {
+        if (at_eof())
+            return std::string();
+
+        // Skip the BOM at the beginning of the file, if present
+        if (skip_bom(false))
+            return std::string();
+
+        // Read the rest
+        std::string file_str(buffer.get() + buffer_pos, buffer.get() + buffer_size);
+        buffer_pos = buffer_size;
+        while (!has_no_data_left()) {
+            file_str.append(buffer.get(), buffer.get() + buffer_size);
+            buffer_pos = buffer_size;
+        }
+
+        handle_newlines(file_str);
+        return file_str;
     }
 
     std::string read_until(char delim, bool keep_delim = false)
