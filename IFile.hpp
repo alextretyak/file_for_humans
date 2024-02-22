@@ -101,6 +101,11 @@ public:
         return fh.get_file_size();
     }
 
+    int64_t tell()
+    {
+        return file_pos_of_buffer_start + buffer_pos;
+    }
+
     /*
     `at_eof()` function works like `eof()` in Pascal, i.e. it returns true if the file is at the end.
     The name `at_the_end()` for this function has been rejected as it is longer, and the name `at_eof()` is still quite correct:
@@ -262,7 +267,7 @@ public:
         }
         else { // file size is unknown, so read via buffer
             std::vector<uint8_t> r;
-            while (!at_eof()) {
+            while (!has_no_data_left()) {
                 r.insert(r.end(), buffer.get(), buffer.get() + buffer_size);
                 buffer_pos = buffer_size;
             }
@@ -272,6 +277,22 @@ public:
 
     std::vector<uint8_t> read_bytes_to_end()
     {
+        int64_t file_size = get_file_size();
+        if (file_size != -2) {
+            file_size -= tell();
+            if (file_size > SIZE_MAX)
+                throw FileIsTooLargeToFitInMemory();
+            return read_bytes((size_t)file_size);
+        }
+        else { // file size is unknown, so read via buffer
+            std::vector<uint8_t> r(buffer.get() + buffer_pos, buffer.get() + buffer_size);
+            buffer_pos = buffer_size;
+            while (!has_no_data_left()) {
+                r.insert(r.end(), buffer.get(), buffer.get() + buffer_size);
+                buffer_pos = buffer_size;
+            }
+            return r;
+        }
     }
 
     size_t read_bytes_at_most(uint8_t *p, size_t count)
