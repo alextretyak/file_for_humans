@@ -8,6 +8,7 @@
 #include <assert.h>
 
 const size_t IFILE_DEFAULT_BUFFER_SIZE = 32*1024;
+const size_t IFILE_BUFFER_SIZE_RIGHT_AFTER_SEEK = 4*1024;
 
 class IFileBufferAlreadyAllocated {};
 class UnexpectedEOF {};
@@ -17,6 +18,9 @@ class ReadTextMustBeCalledAtTheBeginningOfTheFile {};
 class ReadBytesMustBeCalledAtTheBeginningOfTheFile {};
 class FileIsTooLargeToFitInMemory {};
 class OSReportedIncorrectFileSize {};
+class FileSizeIsUnknown {};
+class SeekFailed {};
+class FileDoesNotSupportPositioning {};
 
 /*
 H‘Naming things is hard’
@@ -31,19 +35,28 @@ class IFile
     detail::FileHandle<true> fh;
     std::unique_ptr<uint8_t[]> buffer;
     size_t buffer_pos = 0, buffer_size = 0, buffer_capacity = IFILE_DEFAULT_BUFFER_SIZE;
-    uint64_t file_pos_of_buffer_start = 0;
+    int64_t file_pos_of_buffer_start = 0;
     bool is_eof_reached = false;
     bool eof_indicator = false; // >[https://www.open-std.org/jtc1/sc22/wg14/www/docs/n3096.pdf <- https://en.wikipedia.org/wiki/C23_(C_standard_revision)]:‘The `feof` function tests the end-of-file indicator’
+
+    void allocate_buffer()
+    {
+        if (buffer == nullptr)
+            buffer.reset(new uint8_t[buffer_capacity]);
+    }
 
     NOINLINE bool has_no_data_left()
     {
         assert(buffer_pos == buffer_size); // make sure there is no available data in the buffer
 
-        if (is_eof_reached) // check to prevent extra `read()` syscalls
+        if (is_eof_reached) { // check to prevent extra `read()` syscalls
+            assert(buffer_size != 0);
+            file_pos_of_buffer_start += buffer_size;
+            buffer_pos = buffer_size = 0;
             return true;
+        }
 
-        if (buffer == nullptr)
-            buffer.reset(new uint8_t[buffer_capacity]);
+        allocate_buffer();
 
         file_pos_of_buffer_start += buffer_size;
         buffer_size = fh.read(buffer.get(), buffer_capacity);
@@ -119,12 +132,56 @@ public:
 
     int64_t get_file_size()
     {
-        return fh.get_file_size();
+        int64_t file_size = fh.get_file_size();
+        if (file_size == -2)
+            throw FileSizeIsUnknown();
+        return file_size;
     }
 
     int64_t tell()
     {
         return file_pos_of_buffer_start + buffer_pos;
+    }
+
+    void seek(int64_t new_pos)
+    {
+        if (new_pos < 0)
+            throw SeekFailed();
+
+        is_eof_reached = eof_indicator = false;
+
+        // First, verify that the new read position is within the buffer
+        if (new_pos >= file_pos_of_buffer_start && new_pos <= file_pos_of_buffer_start + int64_t(buffer_size)) {
+            buffer_pos = size_t(new_pos - file_pos_of_buffer_start);
+            return;
+        }
+
+        // Roughly check that the file does not support positioning
+        if (fh.get_file_size() == -2) {
+            if (new_pos < tell())
+                throw FileDoesNotSupportPositioning();
+
+            // Emulate forward seek via reading
+            do {
+                buffer_pos = buffer_size;
+            } while (!has_no_data_left() && new_pos > file_pos_of_buffer_start + int64_t(buffer_size));
+
+            if (new_pos > file_pos_of_buffer_start + int64_t(buffer_size))
+                throw SeekFailed();
+
+            buffer_pos = size_t(new_pos - file_pos_of_buffer_start);
+            return;
+        }
+
+        // Regular seek
+        allocate_buffer();
+
+        file_pos_of_buffer_start = new_pos;
+        buffer_size = fh.read(buffer.get(), IFILE_BUFFER_SIZE_RIGHT_AFTER_SEEK, new_pos);
+        if (buffer_size < IFILE_BUFFER_SIZE_RIGHT_AFTER_SEEK)
+            is_eof_reached = true;
+
+        buffer_pos = 0;
     }
 
     /*
@@ -171,9 +228,9 @@ public:
             throw ReadTextMustBeCalledAtTheBeginningOfTheFile();
 
         std::string file_str;
-        int64_t file_size = get_file_size();
+        int64_t file_size = fh.get_file_size();
         if (file_size != -2) {
-            if (file_size > SIZE_MAX)
+            if (uint64_t(file_size) > SIZE_MAX)
                 throw FileIsTooLargeToFitInMemory();
             size_t file_sz = (size_t)file_size;
             file_str.resize(file_sz);
@@ -326,9 +383,9 @@ public:
         if (!(file_pos_of_buffer_start == 0 && buffer_pos == 0 && buffer_size == 0))
             throw ReadBytesMustBeCalledAtTheBeginningOfTheFile();
 
-        int64_t file_size = get_file_size();
+        int64_t file_size = fh.get_file_size();
         if (file_size != -2) {
-            if (file_size > SIZE_MAX)
+            if (uint64_t(file_size) > SIZE_MAX)
                 throw FileIsTooLargeToFitInMemory();
             size_t file_sz = (size_t)file_size;
             std::vector<uint8_t> r(file_sz);
@@ -349,11 +406,13 @@ public:
 
     std::vector<uint8_t> read_bytes_to_end()
     {
-        int64_t file_size = get_file_size();
+        int64_t file_size = fh.get_file_size();
         if (file_size != -2) {
             file_size -= tell();
-            if (file_size > SIZE_MAX)
+            if (uint64_t(file_size) > SIZE_MAX)
                 throw FileIsTooLargeToFitInMemory();
+            if (file_size == 0) // this `if` is needed to prevent the assertion `buffer_size != 0` in `has_no_data_left()`
+                return std::vector<uint8_t>();
             return read_bytes((size_t)file_size);
         }
         else { // file size is unknown, so read via buffer

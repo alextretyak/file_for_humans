@@ -31,6 +31,7 @@ class GetFileTimeFailed {};
 class GetCreationTimeIsNotImplemented {};
 class FStatFailed {};
 class AttemptToGetFileSizeOfAClosedFile {};
+class LSeekFailed {};
 
 namespace detail
 {
@@ -76,23 +77,39 @@ public:
 
     bool is_valid() {return handle != INVALID_HANDLE_VALUE;}
 
-    size_t read(void *buf, size_t sz)
+private:
+    DWORD ReadFileAtPos(void *buf, DWORD sz, int64_t pos)
+    {
+        DWORD numberOfBytesRead;
+        if (pos == -1) {
+            if (!ReadFile(handle, buf, sz, &numberOfBytesRead, NULL))
+                throw IOError();
+        }
+        else {
+            OVERLAPPED ovp = {0};
+            ovp.Offset     = pos & 0xFFFFFFFF;
+            ovp.OffsetHigh = uint64_t(pos) >> 32;
+            if (!ReadFile(handle, buf, sz, &numberOfBytesRead, &ovp)) {
+                if (GetLastError() != ERROR_HANDLE_EOF)
+                    throw IOError();
+            }
+        }
+        return numberOfBytesRead;
+    }
+public:
+    size_t read(void *buf, size_t sz, int64_t pos = -1)
     {
         if (handle == INVALID_HANDLE_VALUE)
             throw AttemptToReadAClosedFile();
 
         if (sz <= 0xFFFFFFFFu) {
-            DWORD numberOfBytesRead;
-            if (!ReadFile(handle, buf, (DWORD)sz, &numberOfBytesRead, NULL))
-                throw IOError();
-            return numberOfBytesRead;
+            return ReadFileAtPos(buf, (DWORD)sz, pos);
         }
         else {
             char *b = (char*)buf;
             while (true) {
-                DWORD numberOfBytesRead;
-                if (!ReadFile(handle, b, (DWORD)(std::min)(sz, (size_t)0xFFFF0000), &numberOfBytesRead, NULL))
-                    throw IOError();
+                DWORD numberOfBytesRead = ReadFileAtPos(b, (DWORD)(std::min)(sz, (size_t)0xFFFF0000), pos);
+                pos = -1;
                 if (numberOfBytesRead == 0)
                     return b - (char*)buf;
                 b += numberOfBytesRead;
@@ -142,10 +159,14 @@ public:
 
     bool is_valid() {return fd != -1;}
 
-    size_t read(void *buf, size_t sz)
+    size_t read(void *buf, size_t sz, int64_t pos = -1)
     {
         if (fd == -1)
             throw AttemptToReadAClosedFile();
+
+        if (pos != -1)
+            if (lseek(fd, pos, SEEK_SET) != pos || pos > get_file_size()) // the `lseek()` return value is not reliable, so there is an additional check
+                throw LSeekFailed();
 
         char *b = (char*)buf;
         while (true) {

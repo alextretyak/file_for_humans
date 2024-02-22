@@ -49,7 +49,7 @@ public:
     {
         std::ofstream f("test.dat", std::ios::binary);
         for (int i = 0; i < 1024*1024; i++)
-            f.put(rand() % 0xFF);
+            f.put(rand() & 0xFF);
     }
     ~TestDataFileMaker()
     {
