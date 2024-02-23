@@ -32,12 +32,14 @@ class FileIsAlreadyOpened {};
 class AttemptToReadAClosedFile {};
 class IOError {};
 class AttemptToGetTimeOfAClosedFile {};
+class AttemptToSetTimeOfAClosedFile {};
 class GetFileTimeFailed {};
 class GetCreationTimeIsNotSupported {};
 class FStatFailed {};
 class StatXFailed {};
 class AttemptToGetFileSizeOfAClosedFile {};
 class SeekFailed {};
+class SetLastWriteTimeFailed {};
 
 namespace detail
 {
@@ -257,6 +259,16 @@ public:
         }
         return file_size;
     }
+
+    void set_last_write_time(UnixNanotime t)
+    {
+        if (!is_valid())
+            throw AttemptToSetTimeOfAClosedFile();
+
+        uint64_t filetime = t.to_uint64<100, _1601_TO_1970>();
+        if (SetFileTime(handle, NULL, NULL, (FILETIME*)&filetime) == 0)
+            throw SetLastWriteTimeFailed();
+    }
 #else
     void get_last_write_time_and_file_size()
     {
@@ -302,6 +314,18 @@ public:
         if (file_size == -1)
             get_last_write_time_and_file_size();
         return file_size;
+    }
+
+    void set_last_write_time(UnixNanotime t)
+    {
+        if (!is_valid())
+            throw AttemptToSetTimeOfAClosedFile();
+
+        timespec ts[2];
+        ts[0].tv_nsec = UTIME_OMIT;
+        t.to_timespec(ts[1].tv_sec, ts[1].tv_nsec);
+        if (futimens(fd, ts) != 0)
+            throw SetLastWriteTimeFailed();
     }
 #endif
 };

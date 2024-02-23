@@ -21,5 +21,25 @@ public:
             return int64_t(nanoseconds_since_epoch) / 1000000000;
     }
 
+    template <unsigned scale, int64_t offset> uint64_t to_uint64() const
+    {
+        if (nanoseconds_since_epoch < BOUNDARY)
+            return uint64_t(nanoseconds_since_epoch / scale + offset);
+        else
+            return uint64_t(int64_t(nanoseconds_since_epoch) / int(scale) + offset);
+    }
+
+    template <class SecType, class NanoSecType> void to_timespec(SecType &sec, NanoSecType &nsec) const
+    {
+        if (nanoseconds_since_epoch < BOUNDARY) {
+            sec  = nanoseconds_since_epoch / 1000000000u;
+            nsec = nanoseconds_since_epoch % 1000000000u;
+        }
+        else {
+            sec  =   int64_t(nanoseconds_since_epoch) / 1000000000;
+            nsec = -(int64_t(nanoseconds_since_epoch) % 1000000000);
+        }
+    }
+
     bool operator==(const UnixNanotime nt) const {return nanoseconds_since_epoch == nt.nanoseconds_since_epoch;}
 };
