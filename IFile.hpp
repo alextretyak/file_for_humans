@@ -50,7 +50,7 @@ class IFile
         assert(buffer_pos == buffer_size); // make sure there is no available data in the buffer
 
         if (is_eof_reached) { // check to prevent extra `read()` syscalls
-            assert(buffer_size != 0);
+            //assert(buffer_size != 0);
             file_pos_of_buffer_start += buffer_size;
             buffer_pos = buffer_size = 0;
             return true;
@@ -411,8 +411,8 @@ public:
             file_size -= tell();
             if (uint64_t(file_size) > SIZE_MAX)
                 throw FileIsTooLargeToFitInMemory();
-            if (file_size == 0) // this `if` is needed to prevent the assertion `buffer_size != 0` in `has_no_data_left()`
-                return std::vector<uint8_t>();
+            //if (file_size == 0) // this `if` is needed to prevent the assertion `buffer_size != 0` in `has_no_data_left()`
+            //    return std::vector<uint8_t>();
             return read_bytes((size_t)file_size);
         }
         else { // file size is unknown, so read via buffer
@@ -458,7 +458,8 @@ public:
     template <bool check_for_large_read = true> void read_bytes(uint8_t *p, size_t count)
     {
         if (at_eof())
-            throw UnexpectedEOF();
+            if (count != 0)
+                throw UnexpectedEOF();
 
         if (check_for_large_read && count > buffer_capacity) { // optimize large reads (avoid extra `read()` syscalls)
             // First of all, copy all of the remaining bytes in the buffer
