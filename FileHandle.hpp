@@ -321,10 +321,10 @@ public:
         if (!is_valid())
             throw AttemptToSetTimeOfAClosedFile();
 
-        timespec ts[2];
-        ts[0].tv_nsec = UTIME_OMIT;
-        t.to_timespec(ts[1].tv_sec, ts[1].tv_nsec);
-        if (futimens(fd, ts) != 0)
+        timespec times[2];
+        times[0].tv_nsec = UTIME_OMIT;
+        t.to_timespec(times[1]);
+        if (futimens(fd, times) != 0)
             throw SetLastWriteTimeFailed();
     }
 #endif

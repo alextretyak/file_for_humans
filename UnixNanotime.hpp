@@ -10,7 +10,7 @@ class UnixNanotime
 
 public:
     static UnixNanotime from_time_t(time_t t) {return UnixNanotime(t * 1000000000);}
-    static UnixNanotime from_nanotime_t(uint64_t nt) {return UnixNanotime(nt);}
+    static UnixNanotime from_nanotime_t(uint64_t nt) {return UnixNanotime(nt != BOUNDARY ? nt : BOUNDARY + 1);}
     static UnixNanotime uninitialized() {return UnixNanotime(BOUNDARY);}
 
     time_t to_time_t() const
@@ -29,15 +29,15 @@ public:
             return uint64_t(int64_t(nanoseconds_since_epoch) / int(scale) + offset);
     }
 
-    template <class SecType, class NanoSecType> void to_timespec(SecType &sec, NanoSecType &nsec) const
+    template <class TimeSpec> void to_timespec(TimeSpec &ts) const
     {
         if (nanoseconds_since_epoch < BOUNDARY) {
-            sec  = nanoseconds_since_epoch / 1000000000u;
-            nsec = nanoseconds_since_epoch % 1000000000u;
+            ts.tv_sec  = nanoseconds_since_epoch / 1000000000u;
+            ts.tv_nsec = nanoseconds_since_epoch % 1000000000u;
         }
         else {
-            sec  =   int64_t(nanoseconds_since_epoch) / 1000000000;
-            nsec = -(int64_t(nanoseconds_since_epoch) % 1000000000);
+            ts.tv_sec  =   int64_t(nanoseconds_since_epoch) / 1000000000;
+            ts.tv_nsec = -(int64_t(nanoseconds_since_epoch) % 1000000000);
         }
     }
 
