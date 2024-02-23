@@ -19,7 +19,6 @@ class ReadBytesMustBeCalledAtTheBeginningOfTheFile {};
 class FileIsTooLargeToFitInMemory {};
 class OSReportedIncorrectFileSize {};
 class FileSizeIsUnknown {};
-class SeekFailed {};
 class FileDoesNotSupportPositioning {};
 
 /*

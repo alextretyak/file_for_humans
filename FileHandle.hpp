@@ -37,7 +37,7 @@ class GetCreationTimeIsNotSupported {};
 class FStatFailed {};
 class StatXFailed {};
 class AttemptToGetFileSizeOfAClosedFile {};
-class LSeekFailed {};
+class SeekFailed {};
 
 namespace detail
 {
@@ -98,6 +98,8 @@ private:
             if (!ReadFile(handle, buf, sz, &numberOfBytesRead, &ovp)) {
                 if (GetLastError() != ERROR_HANDLE_EOF)
                     throw IOError();
+                else if (pos > get_file_size())
+                    throw SeekFailed();
             }
         }
         return numberOfBytesRead;
@@ -172,7 +174,7 @@ public:
 
         if (pos != -1)
             if (lseek(fd, pos, SEEK_SET) != pos || pos > get_file_size()) // the `lseek()` return value is not reliable, so there is an additional check
-                throw LSeekFailed();
+                throw SeekFailed();
 
         char *b = (char*)buf;
         while (true) {
