@@ -8,6 +8,11 @@
 #include <fcntl.h> // for `open()`
 #include <unistd.h> // for `read()`
 #include <sys/stat.h>
+#if __has_include (<sys/syscall.h>) && __has_include (<linux/stat.h>) // for `statx`
+    // [https://github.com/boostorg/filesystem/blob/master/config/has_statx_syscall.cpp]
+    #include <sys/syscall.h> // for __NR_statx
+    #include <linux/stat.h>  // for `struct statx` and `STATX_BTIME`
+#endif
 #endif
 #include "utf.hpp"
 #include "UnixNanotime.hpp"
@@ -28,8 +33,9 @@ class AttemptToReadAClosedFile {};
 class IOError {};
 class AttemptToGetTimeOfAClosedFile {};
 class GetFileTimeFailed {};
-class GetCreationTimeIsNotImplemented {};
+class GetCreationTimeIsNotSupported {};
 class FStatFailed {};
+class StatXFailed {};
 class AttemptToGetFileSizeOfAClosedFile {};
 class LSeekFailed {};
 
@@ -266,7 +272,21 @@ public:
 public:
     UnixNanotime get_creation_time()
     {
-        throw GetCreationTimeIsNotImplemented();
+#ifndef __NR_statx
+        throw GetCreationTimeIsNotSupported();
+#else
+        if (creation_time == UnixNanotime::uninitialized()) {
+            if (!is_valid())
+                throw AttemptToGetTimeOfAClosedFile();
+
+            struct statx st;
+            // Avoid direct use of `statx()` [appeared in Linux 4.11, glibc 2.28] to support Ubuntu 18.04 [Linux 4.15, glibc 2.27]
+            if (syscall(__NR_statx, (int)fd, "", AT_EMPTY_PATH, STATX_BTIME, &st) != 0 || !(st.stx_mask & STATX_BTIME))
+                throw StatXFailed();
+            creation_time = UnixNanotime::from_nanotime_t(st.stx_btime.tv_sec * 1000000000 + st.stx_btime.tv_nsec);
+        }
+        return creation_time;
+#endif
     }
     UnixNanotime get_last_write_time()
     {
