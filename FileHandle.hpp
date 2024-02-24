@@ -30,6 +30,7 @@ class FileOpenError {};
 class WrongFileNameStr {};
 class FileIsAlreadyOpened {};
 class AttemptToReadAClosedFile {};
+class AttemptToWriteAClosedFile {};
 class IOError {};
 class AttemptToGetTimeOfAClosedFile {};
 class AttemptToSetTimeOfAClosedFile {};
@@ -130,6 +131,16 @@ public:
         }
     }
 
+    void write(const void *buf, size_t sz)
+    {
+        if (handle == INVALID_HANDLE_VALUE)
+            throw AttemptToWriteAClosedFile();
+
+        DWORD numberOfBytesWritten;
+        if (!WriteFile(handle, buf, sz, &numberOfBytesWritten, NULL) || numberOfBytesWritten != sz)
+            throw IOError();
+    }
+
     void close()
     {
         if (handle != INVALID_HANDLE_VALUE) {
@@ -189,6 +200,21 @@ public:
             sz -= r;
             if (sz == 0)
                 return b - (char*)buf;
+        }
+    }
+
+    void write(const void *buf, size_t sz)
+    {
+        if (fd == -1)
+            throw AttemptToWriteAClosedFile();
+
+        char *b = (char*)buf;
+        while (sz != 0) {
+            ssize_t r = ::write(fd, b, std::min(sz, (size_t)0x7ffff000)); // On Linux, write() will transfer at most 0x7ffff000 bytes
+            if (r == -1 || r == 0)
+                throw IOError();
+            b += r;
+            sz -= r;
         }
     }
 
