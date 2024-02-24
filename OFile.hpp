@@ -14,6 +14,12 @@ class OFile
     std::unique_ptr<uint8_t[]> buffer;
     size_t buffer_pos = 0, buffer_capacity = OFILE_DEFAULT_BUFFER_SIZE;
 
+    void allocate_buffer()
+    {
+        if (buffer == nullptr)
+            buffer.reset(new uint8_t[buffer_capacity]);
+    }
+
 public:
     template <class... Args> OFile(Args&&... args) : fh(std::forward<Args>(args)...) {}
     template <class... Args> bool open(Args&&... args) {return fh.open(std::forward<Args>(args)...);}
@@ -40,10 +46,17 @@ public:
         }
     }
 
+    void write_byte(uint8_t b)
+    {
+        allocate_buffer();
+        if (buffer_pos == buffer_capacity)
+            flush();
+        buffer[buffer_pos++] = b;
+    }
+
     void write(const void *vp, size_t sz)
     {
-        if (buffer == nullptr)
-            buffer.reset(new uint8_t[buffer_capacity]);
+        allocate_buffer();
 
         if (sz > buffer_capacity) { // optimize large writes (avoid extra `write()` syscalls)
             flush(); // first of all, write all of the remaining bytes in the buffer
