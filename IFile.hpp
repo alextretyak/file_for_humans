@@ -94,7 +94,7 @@ class IFile
         size_t cr_pos = s.find('\r');
         if (cr_pos != std::string::npos) {
             char *dest = const_cast<char *>(s.c_str()) + cr_pos;
-            const char *src = dest + 1, *end = s.c_str() + s.size();
+            const char *src = dest, *end = s.c_str() + s.size();
             while (src < end) {
                 if (*src == '\r' && src[1] == '\n') {
                     src++;
@@ -196,7 +196,7 @@ public:
     }
 
     /*
-    `eof_passed()` function works like `eof()` in C, i.e. it returns true if a read operation has attempted to read past the end of the file.
+    `eof_passed()` function works like `eof()` in C++, i.e. it returns true if a read operation has attempted to read past the end of the file.
     The name of this function was inspired by:
     >[https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/feof]:‘the end of `stream` has been passed.’
     The name `eof_reached()` for this function has been rejected because it is confusing:
