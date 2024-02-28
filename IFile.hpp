@@ -173,14 +173,21 @@ public:
         }
 
         // Regular seek
+        if (new_pos > get_file_size())
+            throw SeekFailed();
+
         allocate_buffer();
 
-        file_pos_of_buffer_start = new_pos;
-        buffer_size = fh.read(buffer.get(), IFILE_BUFFER_SIZE_RIGHT_AFTER_SEEK, new_pos);
-        if (buffer_size < IFILE_BUFFER_SIZE_RIGHT_AFTER_SEEK)
+        file_pos_of_buffer_start = new_pos & ~(IFILE_BUFFER_SIZE_RIGHT_AFTER_SEEK - 1);
+        size_t how_much_to_read = IFILE_BUFFER_SIZE_RIGHT_AFTER_SEEK;
+        if (file_pos_of_buffer_start + IFILE_BUFFER_SIZE_RIGHT_AFTER_SEEK - new_pos
+                                     < IFILE_BUFFER_SIZE_RIGHT_AFTER_SEEK / 8) // if `new_pos` is too close to the end of the buffer, then read more
+            how_much_to_read *= 2;
+        buffer_size = fh.read(buffer.get(), how_much_to_read, file_pos_of_buffer_start);
+        if (buffer_size < how_much_to_read)
             is_eof_reached = true;
 
-        buffer_pos = 0;
+        buffer_pos = size_t(new_pos - file_pos_of_buffer_start);
     }
 
     /*
