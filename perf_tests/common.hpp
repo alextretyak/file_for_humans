@@ -1,5 +1,6 @@
 #include <chrono>
 #include <stdio.h>
+#include <float.h> // for DBL_MAX in GCC
 #include <fstream>
 #include "../IFile.hpp"
 

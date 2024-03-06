@@ -1,4 +1,7 @@
 #include "common.hpp"
+#ifdef _WIN32
+#define getc_unlocked _getc_nolock
+#endif
 
 int main()
 {
@@ -86,4 +89,19 @@ int main()
             r += c;
         return r;
     }, "with 32KiB buffer");
+
+    test_c([](FILE *f) {
+        uint32_t r = 0;
+        for (int c; (c = getc_unlocked(f)) != EOF;)
+            r += c;
+        return r;
+    }, "getc_unlocked");
+
+    test_c([](FILE *f) {
+        setvbuf(f, NULL, _IOFBF, 32 * 1024);
+        uint32_t r = 0;
+        for (int c; (c = getc_unlocked(f)) != EOF;)
+            r += c;
+        return r;
+    }, "getc_unlocked with 32KiB buffer");
 }
