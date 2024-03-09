@@ -111,7 +111,15 @@ class IFile
 public:
     template <class... Args> IFile(Args&&... args) : fh(std::forward<Args>(args)...) {}
     template <class... Args> bool open(Args&&... args) {return fh.open(std::forward<Args>(args)...);}
-    ~IFile() {fh.close();}
+#if defined(_MSC_VER) && _MSC_VER <= 1800 // for `f = IFile(fname);` in MSVC 2013
+    IFile(IFile &&f) : fh(std::move(f.fh)), buffer(std::move(f.buffer)), buffer_pos(f.buffer_pos), buffer_size(f.buffer_size), buffer_capacity(f.buffer_capacity), file_pos_of_buffer_start(f.file_pos_of_buffer_start), is_eof_reached(f.is_eof_reached), eof_indicator(f.eof_indicator) {}
+    IFile &operator=(IFile &&f)
+    {
+        move_assign(this, std::move(f));
+        return *this;
+    }
+#endif
+//  ~IFile() {fh.close();}
     void close()
     {
         fh.close();

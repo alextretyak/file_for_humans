@@ -163,7 +163,7 @@ public:
     {
         if (s[len] != 0)
             throw WrongFileNameStr();
-        open(s);
+        return open(s);
     }
 
     bool open(const char *s)
@@ -226,9 +226,9 @@ public:
         }
     }
 #endif
-#if !defined(_MSC_VER) || _MSC_VER > 1800 // unfortunately, MSVC 2013 doesn't support defaulted move constructors
+#if !defined(_MSC_VER) || _MSC_VER > 1800
     FileHandle(FileHandle &&) = default;
-#else
+#else // unfortunately, MSVC 2013 doesn't support defaulted move constructors
     FileHandle(FileHandle &&fh) : handle(std::move(fh.handle)), creation_time(fh.creation_time), last_write_time(fh.last_write_time), file_size(fh.file_size) {}
 #endif
     FileHandle &operator=(FileHandle &&fh)

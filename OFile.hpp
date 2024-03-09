@@ -23,6 +23,16 @@ class OFile
 public:
     template <class... Args> OFile(Args&&... args) : fh(std::forward<Args>(args)...) {}
     template <class... Args> bool open(Args&&... args) {return fh.open(std::forward<Args>(args)...);}
+#if !defined(_MSC_VER) || _MSC_VER > 1800
+    OFile(OFile &&) = default;
+#else // unfortunately, MSVC 2013 doesn't support defaulted move constructors
+    OFile(OFile &&f) : fh(std::move(f.fh)), buffer(std::move(f.buffer)), buffer_pos(f.buffer_pos), buffer_capacity(f.buffer_capacity) {}
+#endif
+    OFile &operator=(OFile &&f)
+    {
+        move_assign(this, std::move(f));
+        return *this;
+    }
     ~OFile() {flush();}
     void close()
     {
