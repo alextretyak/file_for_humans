@@ -10,6 +10,7 @@ class OFileBufferAlreadyAllocated {};
 
 class OFile
 {
+protected:
     detail::FileHandle<false> fh;
     std::unique_ptr<uint8_t[]> buffer;
     size_t buffer_pos = 0, buffer_capacity = OFILE_DEFAULT_BUFFER_SIZE;
@@ -26,7 +27,7 @@ public:
 #if !defined(_MSC_VER) || _MSC_VER > 1800
     OFile(OFile &&) = default;
 #else // unfortunately, MSVC 2013 doesn't support defaulted move constructors
-    OFile(OFile &&f) : fh(std::move(f.fh)), buffer(std::move(f.buffer)), buffer_pos(f.buffer_pos), buffer_capacity(f.buffer_capacity) {}
+    OFile(OFile &&f) : fh(std::move(f.fh)), buffer(std::move(f.buffer)), buffer_pos(f.buffer_pos), buffer_capacity(f.buffer_capacity) {f.buffer_pos = 0;}
 #endif
     OFile &operator=(OFile &&f)
     {
@@ -38,7 +39,7 @@ public:
     {
         flush();
         fh.close();
-        buffer_pos = 0;
+        //buffer_pos = 0;
     }
 
     void set_buffer_size(size_t sz)

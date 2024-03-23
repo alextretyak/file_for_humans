@@ -5,7 +5,9 @@
 #include "FileHandle.hpp"
 #include <memory> // for std::unique_ptr
 #include <string.h> // for memcmp and memchr [GCC]
+#ifndef assert
 #include <assert.h>
+#endif
 
 const size_t IFILE_DEFAULT_BUFFER_SIZE = 32*1024;
 const size_t IFILE_BUFFER_SIZE_RIGHT_AFTER_SEEK = 4*1024;
@@ -31,6 +33,7 @@ so you can think of `IFile` and `OFile` as short forms of them.
 */
 class IFile
 {
+protected:
     detail::FileHandle<true> fh;
     std::unique_ptr<uint8_t[]> buffer;
     size_t buffer_pos = 0, buffer_size = 0, buffer_capacity = IFILE_DEFAULT_BUFFER_SIZE;
@@ -145,7 +148,7 @@ public:
         return file_size;
     }
 
-    int64_t tell()
+    int64_t tell() const
     {
         return file_pos_of_buffer_start + buffer_pos;
     }

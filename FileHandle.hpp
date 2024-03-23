@@ -27,6 +27,7 @@
 #endif
 
 class FileOpenError {};
+class AssignNonStdHandle {};
 class WrongFileNameStr {};
 class FileIsAlreadyOpened {};
 class AttemptToReadAClosedFile {};
@@ -44,6 +45,18 @@ class SetLastWriteTimeFailed {};
 
 namespace detail
 {
+#ifdef _WIN32
+inline HANDLE  stdin_handle() {static HANDLE h = GetStdHandle(STD_INPUT_HANDLE ); return h;}
+inline HANDLE stdout_handle() {static HANDLE h = GetStdHandle(STD_OUTPUT_HANDLE); return h;}
+#else
+inline int  stdin_handle() {return  STDIN_FILENO;}
+inline int stdout_handle() {return STDOUT_FILENO;}
+#endif
+
+template <bool for_reading, typename RetType = decltype(stdin_handle())> RetType std_handle(); // RetType is needed only for MSVC 2013 [error C2912: explicit specialization 'HANDLE detail::std_handle<true>(void)' is not a specialization of a function template]
+template <> inline decltype(stdin_handle()) std_handle<true> () {return  stdin_handle();}   // \\ This solution was inspired by [https://stackoverflow.com/questions/55941641/specializing-a-template-with-a-return-type-derived-by-decltype-in-visual-studio <- google:‘c++ decltype error C2912’]
+template <> inline decltype(stdin_handle()) std_handle<false>() {return stdout_handle();}
+
 template <bool for_reading> class FileHandle
 {
 public:
@@ -62,6 +75,14 @@ public:
     FileHandle(const char16_t *s, size_t len) {if (!open(s, len)) throw FileOpenError();}
     FileHandle(const char16_t *s) {if (!open(s)) throw FileOpenError();}
     FileHandle(const char *s) : FileHandle(utf::as_u16(s)) {}
+
+    void assign_std_handle(HANDLE h)
+    {
+        handle = h;
+        if (!is_std_handle())
+            throw AssignNonStdHandle();
+    }
+    void assign_std_handle(const FileHandle &fh) {assign_std_handle(fh.handle);}
 
     bool open(const char *s, size_t len) {return open(utf::as_u16(utf::std::string_view(s, len)));}
     bool open(const char *s)             {return open(utf::as_u16(s));}
@@ -137,12 +158,16 @@ public:
             throw AttemptToWriteAClosedFile();
 
         DWORD numberOfBytesWritten;
-        if (!WriteFile(handle, buf, sz, &numberOfBytesWritten, NULL) || numberOfBytesWritten != sz)
+        if (!WriteFile(handle, buf, (DWORD)sz, &numberOfBytesWritten, NULL) || numberOfBytesWritten != sz)
             throw IOError();
     }
 
+    bool is_std_handle() const {return handle == std_handle<for_reading>();}
+
     void close()
     {
+        if (is_std_handle())
+            handle = INVALID_HANDLE_VALUE;
         if (handle != INVALID_HANDLE_VALUE) {
             CloseHandle(handle);
             handle = INVALID_HANDLE_VALUE;
@@ -156,6 +181,14 @@ public:
     FileHandle(const char *s, size_t len) {if (!open(s, len)) throw FileOpenError();}
     FileHandle(const char16_t *s) : FileHandle(utf::as_str8(s)) {}
     FileHandle(const char16_t *s, size_t len) : FileHandle(utf::as_str8(utf::std::u16string_view(s, len))) {}
+
+    void assign_std_handle(int d)
+    {
+        fd = d;
+        if (!is_std_handle())
+            throw AssignNonStdHandle();
+    }
+    void assign_std_handle(const FileHandle &fh) {assign_std_handle(fh.fd);}
 
     bool open(const char16_t *s, size_t len) {return open(utf::as_str8(utf::std::u16string_view(s, len)));}
     bool open(const char16_t *s)             {return open(utf::as_str8(s));}
@@ -218,8 +251,12 @@ public:
         }
     }
 
+    bool is_std_handle() const {return fd == std_handle<for_reading>();}
+
     void close()
     {
+        if (is_std_handle())
+            fd = -1;
         if (fd != -1) {
             ::close(fd);
             fd = -1;
