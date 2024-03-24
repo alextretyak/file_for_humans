@@ -166,6 +166,16 @@ public:
             throw IOError();
     }
 
+    void seek(int64_t pos)
+    {
+        static_assert(!for_reading, "seek() is only allowed when writing");
+
+        LARGE_INTEGER liDistanceToMove;
+        liDistanceToMove.QuadPart = pos;
+        if (!SetFilePointerEx(handle, liDistanceToMove, NULL, FILE_BEGIN))
+            throw SeekFailed();
+    }
+
     bool is_std_handle() const {return detail::is_std_handle<for_reading>(handle);}
 
     void close()
@@ -253,6 +263,14 @@ public:
             b += r;
             sz -= r;
         }
+    }
+
+    void seek(int64_t pos)
+    {
+        static_assert(!for_reading, "seek() is only allowed when writing");
+
+        if (lseek(fd, pos, SEEK_SET) != pos)
+            throw SeekFailed();
     }
 
     bool is_std_handle() const {return detail::is_std_handle<for_reading>(fd);}

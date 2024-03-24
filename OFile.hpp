@@ -57,6 +57,12 @@ public:
         }
     }
 
+    void seek(int64_t pos)
+    {
+        flush();
+        fh.seek(pos);
+    }
+
     void write_byte(uint8_t b)
     {
         allocate_buffer();
