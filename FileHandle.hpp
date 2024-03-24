@@ -48,14 +48,18 @@ namespace detail
 #ifdef _WIN32
 inline HANDLE  stdin_handle() {static HANDLE h = GetStdHandle(STD_INPUT_HANDLE ); return h;}
 inline HANDLE stdout_handle() {static HANDLE h = GetStdHandle(STD_OUTPUT_HANDLE); return h;}
+inline HANDLE stderr_handle() {static HANDLE h = GetStdHandle(STD_ERROR_HANDLE ); return h;}
+typedef HANDLE HandleType;
 #else
 inline int  stdin_handle() {return  STDIN_FILENO;}
 inline int stdout_handle() {return STDOUT_FILENO;}
+inline int stderr_handle() {return STDERR_FILENO;}
+typedef int HandleType;
 #endif
 
-template <bool for_reading, typename RetType = decltype(stdin_handle())> RetType std_handle(); // RetType is needed only for MSVC 2013 [error C2912: explicit specialization 'HANDLE detail::std_handle<true>(void)' is not a specialization of a function template]
-template <> inline decltype(stdin_handle()) std_handle<true> () {return  stdin_handle();}   // \\ This solution was inspired by [https://stackoverflow.com/questions/55941641/specializing-a-template-with-a-return-type-derived-by-decltype-in-visual-studio <- google:‘c++ decltype error C2912’]
-template <> inline decltype(stdin_handle()) std_handle<false>() {return stdout_handle();}
+template <bool for_reading> bool is_std_handle(HandleType);
+template <> inline bool is_std_handle<true> (HandleType handle) {return handle ==  stdin_handle();}
+template <> inline bool is_std_handle<false>(HandleType handle) {return handle == stdout_handle() || handle == stderr_handle();}
 
 template <bool for_reading> class FileHandle
 {
@@ -162,7 +166,7 @@ public:
             throw IOError();
     }
 
-    bool is_std_handle() const {return handle == std_handle<for_reading>();}
+    bool is_std_handle() const {return detail::is_std_handle<for_reading>(handle);}
 
     void close()
     {
@@ -251,7 +255,7 @@ public:
         }
     }
 
-    bool is_std_handle() const {return fd == std_handle<for_reading>();}
+    bool is_std_handle() const {return detail::is_std_handle<for_reading>(fd);}
 
     void close()
     {
