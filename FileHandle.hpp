@@ -65,20 +65,20 @@ template <bool for_reading> class FileHandle
 {
 public:
     // Redirecting common constructors
-    FileHandle(const std::string    &s) : FileHandle(s.c_str(), s.length()) {}
-    FileHandle(const std::u16string &s) : FileHandle(s.c_str(), s.length()) {}
+    FileHandle(const std::string    &s, bool append = false) : FileHandle(s.c_str(), s.length(), append) {}
+    FileHandle(const std::u16string &s, bool append = false) : FileHandle(s.c_str(), s.length(), append) {}
 
-    bool  open(const std::string    &s) {return open(s.c_str(), s.length());}
-    bool  open(const std::u16string &s) {return open(s.c_str(), s.length());}
+    bool  open(const std::string    &s, bool append = false) {return open(s.c_str(), s.length(), append);}
+    bool  open(const std::u16string &s, bool append = false) {return open(s.c_str(), s.length(), append);}
 
 #ifdef _WIN32
     UniqueHandle<HANDLE, INVALID_HANDLE_VALUE> handle;
 
     FileHandle() {}
-    FileHandle(const char *s, size_t len) : FileHandle(utf::as_u16(utf::std::string_view(s, len))) {}
-    FileHandle(const char16_t *s, size_t len) {if (!open(s, len)) throw FileOpenError();}
-    FileHandle(const char16_t *s) {if (!open(s)) throw FileOpenError();}
-    FileHandle(const char *s) : FileHandle(utf::as_u16(s)) {}
+    FileHandle(const char *s, size_t len, bool append = false) : FileHandle(utf::as_u16(utf::std::string_view(s, len)), append) {}
+    FileHandle(const char16_t *s, size_t len, bool append = false) {if (!open(s, len, append)) throw FileOpenError();}
+    FileHandle(const char16_t *s, bool append = false) {if (!open(s, append)) throw FileOpenError();}
+    FileHandle(const char *s, bool append = false) : FileHandle(utf::as_u16(s), append) {}
 
     void assign_std_handle(HANDLE h)
     {
@@ -88,24 +88,32 @@ public:
     }
     void assign_std_handle(const FileHandle &fh) {assign_std_handle(fh.handle);}
 
-    bool open(const char *s, size_t len) {return open(utf::as_u16(utf::std::string_view(s, len)));}
-    bool open(const char *s)             {return open(utf::as_u16(s));}
-    bool open(const char16_t *s, size_t len)
+    bool open(const char *s, size_t len, bool append = false) {return open(utf::as_u16(utf::std::string_view(s, len)), append);}
+    bool open(const char *s,             bool append = false) {return open(utf::as_u16(s), append);}
+    bool open(const char16_t *s, size_t len, bool append = false)
     {
         if (s[len] != 0)
             throw WrongFileNameStr();
-        return open(s);
+        return open(s, append);
     }
 
-    bool open(const char16_t *s)
+    bool open(const char16_t *s, bool append = false)
     {
         if (handle != INVALID_HANDLE_VALUE)
             throw FileIsAlreadyOpened();
 
         if (for_reading)
             handle = CreateFileW((wchar_t*)s, GENERIC_READ , FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-        else
-            handle = CreateFileW((wchar_t*)s, GENERIC_WRITE, 0              , NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+        else {
+            handle = CreateFileW((wchar_t*)s, GENERIC_WRITE, 0, NULL, append ? OPEN_ALWAYS : CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+            if (handle == INVALID_HANDLE_VALUE)
+                return false;
+            if (append) {
+                LARGE_INTEGER liDistanceToMove = {0};
+                if (!SetFilePointerEx(handle, liDistanceToMove, NULL, FILE_END))
+                    throw SeekFailed();
+            }
+        }
         return handle != INVALID_HANDLE_VALUE;
     }
 
@@ -191,10 +199,10 @@ public:
     UniqueHandle<int, -1> fd;
 
     FileHandle() {}
-    FileHandle(const char *s) {if (!open(s)) throw FileOpenError();}
-    FileHandle(const char *s, size_t len) {if (!open(s, len)) throw FileOpenError();}
-    FileHandle(const char16_t *s) : FileHandle(utf::as_str8(s)) {}
-    FileHandle(const char16_t *s, size_t len) : FileHandle(utf::as_str8(utf::std::u16string_view(s, len))) {}
+    FileHandle(const char *s, bool append = false) {if (!open(s, append)) throw FileOpenError();}
+    FileHandle(const char *s, size_t len, bool append = false) {if (!open(s, len, append)) throw FileOpenError();}
+    FileHandle(const char16_t *s, bool append = false) : FileHandle(utf::as_str8(s), append) {}
+    FileHandle(const char16_t *s, size_t len, bool append = false) : FileHandle(utf::as_str8(utf::std::u16string_view(s, len)), append) {}
 
     void assign_std_handle(int d)
     {
@@ -204,16 +212,16 @@ public:
     }
     void assign_std_handle(const FileHandle &fh) {assign_std_handle(fh.fd);}
 
-    bool open(const char16_t *s, size_t len) {return open(utf::as_str8(utf::std::u16string_view(s, len)));}
-    bool open(const char16_t *s)             {return open(utf::as_str8(s));}
-    bool open(const char *s, size_t len)
+    bool open(const char16_t *s, size_t len, bool append = false) {return open(utf::as_str8(utf::std::u16string_view(s, len)), append);}
+    bool open(const char16_t *s,             bool append = false) {return open(utf::as_str8(s), append);}
+    bool open(const char *s, size_t len, bool append = false)
     {
         if (s[len] != 0)
             throw WrongFileNameStr();
-        return open(s);
+        return open(s, append);
     }
 
-    bool open(const char *s)
+    bool open(const char *s, bool append = false)
     {
         if (fd != -1)
             throw FileIsAlreadyOpened();
@@ -221,7 +229,7 @@ public:
         if (for_reading)
             fd = ::open(s, O_RDONLY);
         else
-            fd = creat(s, 0666);
+            fd = ::open(s, O_WRONLY|O_CREAT|(append ? O_APPEND : O_TRUNC), 0666);
         return fd != -1;
     }
 
