@@ -73,13 +73,13 @@ public:
 
     void write(const void *vp, size_t sz)
     {
-        allocate_buffer();
-
         if (sz > buffer_capacity) { // optimize large writes (avoid extra `write()` syscalls)
             flush(); // first of all, write all of the remaining bytes in the buffer
             fh.write(vp, sz);
             return;
         }
+
+        allocate_buffer();
 
         uint8_t *p = (uint8_t*)vp;
 
