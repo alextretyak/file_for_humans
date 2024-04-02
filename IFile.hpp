@@ -298,7 +298,7 @@ public:
         return file_str;
     }
 
-    std::string read_until(char delim, bool keep_delim = false)
+    void read_until(std::string &res, char delim, bool keep_delim = false)
     {
         if (at_eof())
             throw UnexpectedEOF();
@@ -309,28 +309,34 @@ public:
         // Scan buffer for delim
         if (uint8_t *p = (uint8_t*)memchr(buffer.get() + buffer_pos, delim, buffer_size - buffer_pos)) {
             size_t res_size = p - (buffer.get() + buffer_pos);
-            std::string res((char*)buffer.get() + buffer_pos, res_size + int(keep_delim));
+            res.assign((char*)buffer.get() + buffer_pos, res_size + int(keep_delim));
             buffer_pos += res_size + 1;
-            return res;
+            return;
         }
 
-        std::string res((char*)buffer.get() + buffer_pos, buffer_size - buffer_pos);
+        res.assign((char*)buffer.get() + buffer_pos, buffer_size - buffer_pos);
         buffer_pos = buffer_size;
         while (!has_no_data_left()) {
             if (uint8_t *p = (uint8_t*)memchr(buffer.get(), delim, buffer_size)) {
                 res.append((char*)buffer.get(), p - buffer.get() + int(keep_delim));
                 buffer_pos += p - buffer.get() + 1;
-                return res;
+                return;
             }
             res.append((char*)buffer.get(), buffer_size);
             buffer_pos = buffer_size;
         }
-        return res;
     }
 
-    std::string read_line(bool keep_newline = false)
+    std::string read_until(char delim, bool keep_delim = false)
     {
-        std::string r = read_until('\n', keep_newline);
+        std::string r;
+        read_until(r, delim, keep_delim);
+        return r;
+    }
+
+    void read_line(std::string &r, bool keep_newline = false)
+    {
+        read_until(r, '\n', keep_newline);
         if (!keep_newline) {
             if (!r.empty() && r.back() == '\r')
                 r.pop_back();
@@ -338,6 +344,12 @@ public:
         else
             if (r.back() == '\n' && r.length() >= 2 && r[r.length() - 2] == '\r')
                 r.erase(r.length() - 2, 1);
+    }
+
+    std::string read_line(bool keep_newline = false)
+    {
+        std::string r;
+        read_line(r, keep_newline);
         return r;
     }
 
