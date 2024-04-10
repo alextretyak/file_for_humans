@@ -544,7 +544,7 @@ public:
         return r;
     }
 
-    bool starts_with(const char *s) // s — signature/‘sequence of chars’
+    bool starts_with(utf::std::string_view s) // s — signature/‘sequence of chars’
     {
         if (!(file_pos_of_buffer_start == 0 && buffer_pos == 0))
             throw StartsWithMustBeCalledAtTheBeginningOfTheFile();
@@ -552,8 +552,7 @@ public:
         if (at_eof())
             return false;
 
-        size_t len = strlen(s);
-        return buffer_size >= len && memcmp(buffer.get(), s, len) == 0;
+        return buffer_size >= s.size() && memcmp(buffer.get(), s.data(), s.size()) == 0;
     }
 
     UnixNanotime   get_creation_time() {return   fh.get_creation_time();}
