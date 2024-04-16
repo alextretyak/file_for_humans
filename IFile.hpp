@@ -298,7 +298,7 @@ public:
         return file_str;
     }
 
-    void read_until(std::string &res, char delim, bool keep_delim = false)
+    template <bool handle_nl = true> void read_until(std::string &res, char delim, bool keep_delim = false)
     {
         if (at_eof())
             throw UnexpectedEOF();
@@ -311,6 +311,7 @@ public:
             size_t res_size = p - (buffer.get() + buffer_pos);
             res.assign((char*)buffer.get() + buffer_pos, res_size + int(keep_delim));
             buffer_pos += res_size + 1;
+            if (handle_nl) handle_newlines(res);
             return;
         }
 
@@ -320,23 +321,25 @@ public:
             if (uint8_t *p = (uint8_t*)memchr(buffer.get(), delim, buffer_size)) {
                 res.append((char*)buffer.get(), p - buffer.get() + int(keep_delim));
                 buffer_pos += p - buffer.get() + 1;
+                if (handle_nl) handle_newlines(res);
                 return;
             }
             res.append((char*)buffer.get(), buffer_size);
             buffer_pos = buffer_size;
         }
+        if (handle_nl) handle_newlines(res);
     }
 
-    std::string read_until(char delim, bool keep_delim = false)
+    template <bool handle_nl = true> std::string read_until(char delim, bool keep_delim = false)
     {
         std::string r;
-        read_until(r, delim, keep_delim);
+        read_until<handle_nl>(r, delim, keep_delim);
         return r;
     }
 
     void read_line(std::string &r, bool keep_newline = false)
     {
-        read_until(r, '\n', keep_newline);
+        read_until<false>(r, '\n', keep_newline);
         if (!keep_newline) {
             if (!r.empty() && r.back() == '\r')
                 r.pop_back();
@@ -366,7 +369,7 @@ public:
             return std::string(); // when the EOF is reached, this function returns an empty string instead of throwing an UnexpectedEOF exception
         }
 
-        std::string r = read_until('\n', true);
+        std::string r = read_until<false>('\n', true);
         assert(!r.empty()); // the above code guarantees that `r` cannot be empty here
         if (r.back() != '\n') {
             assert(is_eof_reached && buffer_pos == buffer_size);
