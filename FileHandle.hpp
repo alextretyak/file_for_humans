@@ -117,6 +117,8 @@ public:
         return handle != INVALID_HANDLE_VALUE;
     }
 
+    bool is_associated_with_console() const {return GetFileType(handle) == FILE_TYPE_CHAR;} // >[https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/isatty]:‘is associated with a character device (a terminal, console, ...)’
+
     bool is_valid() {return handle != INVALID_HANDLE_VALUE;}
 
 private:
@@ -232,6 +234,8 @@ public:
             fd = ::open(s, O_WRONLY|O_CREAT|(append ? O_APPEND : O_TRUNC), 0666);
         return fd != -1;
     }
+
+    bool is_associated_with_console() const {return isatty(fd) != 0;}
 
     bool is_valid() {return fd != -1;}
 
