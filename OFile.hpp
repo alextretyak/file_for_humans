@@ -7,6 +7,7 @@
 const size_t OFILE_DEFAULT_BUFFER_SIZE = 32*1024;
 
 class OFileBufferAlreadyAllocated {};
+class OFileWriteUTF16DecodeError {};
 
 class OFile
 {
@@ -106,6 +107,40 @@ public:
     void write(utf::std::string_view sv)
     {
         write(sv.data(), sv.size());
+    }
+
+    void write(utf::std::u16string_view sv)
+    {
+        allocate_buffer();
+
+        class FakeContainer
+        {
+            OFile *ofile;
+
+        public:
+            using value_type = char;
+
+            FakeContainer(OFile *ofile) : ofile(ofile) {}
+
+            void push_back(char c)
+            {
+                if (ofile->buffer_pos == ofile->buffer_capacity)
+                    ofile->flush();
+                ofile->buffer[ofile->buffer_pos++] = c;
+            }
+        } fc(this);
+
+        auto source = sv.begin();
+        auto source_end = sv.end();
+        auto target = std::back_inserter(fc);
+
+        while (source < source_end) {
+            bool ok = false;
+            char32_t ch = utf::decode(source, source_end, ok);
+            if (!ok) throw OFileWriteUTF16DecodeError();
+
+            utf::encode_to_utf8(ch, target);
+        }
     }
 
     void set_last_write_time(UnixNanotime t)

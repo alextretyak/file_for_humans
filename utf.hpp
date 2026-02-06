@@ -316,8 +316,9 @@ namespace utf {
         return *source++;
     }
 
-    static inline void encode(char32_t ch,
-                              std::back_insert_iterator<std::string>& target) {
+    template <class ContainerType>
+    static inline void encode_to_utf8(char32_t ch,
+                                      std::back_insert_iterator<ContainerType>& target) {
         unsigned short bytesToWrite = 0;
 
         /* Figure out how many bytes the result will require */
@@ -358,6 +359,11 @@ namespace utf {
         }
         for (int i = 0; i < bytesToWrite; ++i)
             *target++ = static_cast<char>(*midp++);
+    }
+
+    static inline void encode(char32_t ch,
+                              std::back_insert_iterator<std::string>& target) {
+        encode_to_utf8(ch, target);
     }
 
 #ifdef __cpp_lib_char8_t
