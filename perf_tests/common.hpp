@@ -46,10 +46,10 @@ bool at_eof_cpp_peek(std::ifstream &f)
 class TestDataFileMaker
 {
 public:
-    TestDataFileMaker()
+    TestDataFileMaker(int file_size = 1024*1024)
     {
         std::ofstream f("test.dat", std::ios::binary);
-        for (int i = 0; i < 1024*1024; i++)
+        for (int i = 0; i < file_size; i++)
             f.put(rand() & 0xFF);
     }
     ~TestDataFileMaker()
